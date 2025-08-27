@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 :root {
-  --background: hsl(0 0% 100%);
+  --background: hsl(35 25% 97%);
   --foreground: hsl(222.2 84% 4.9%);
   --card: hsl(0 0% 100%);
   --card-foreground: hsl(222.2 84% 4.9%);
@@ -54,24 +54,24 @@
 }
 
 .dark {
-  --background: hsl(222.2 84% 4.9%);
-  --foreground: hsl(210 40% 98%);
-  --card: hsl(222.2 84% 4.9%);
-  --card-foreground: hsl(210 40% 98%);
-  --popover: hsl(222.2 84% 4.9%);
-  --popover-foreground: hsl(210 40% 98%);
+  --background: hsl(220 13% 8%);
+  --foreground: hsl(35 25% 95%);
+  --card: hsl(220 13% 10%);
+  --card-foreground: hsl(35 25% 95%);
+  --popover: hsl(220 13% 12%);
+  --popover-foreground: hsl(35 25% 95%);
   --primary: hsl(217.2 91.2% 59.8%);
-  --primary-foreground: hsl(222.2 84% 4.9%);
-  --secondary: hsl(217.2 32.6% 17.5%);
-  --secondary-foreground: hsl(210 40% 98%);
-  --muted: hsl(217.2 32.6% 17.5%);
-  --muted-foreground: hsl(215 20.2% 65.1%);
-  --accent: hsl(217.2 32.6% 17.5%);
-  --accent-foreground: hsl(210 40% 98%);
-  --destructive: hsl(0 62.8% 30.6%);
-  --destructive-foreground: hsl(210 40% 98%);
-  --border: hsl(217.2 32.6% 17.5%);
-  --input: hsl(217.2 32.6% 17.5%);
+  --primary-foreground: hsl(220 13% 8%);
+  --secondary: hsl(220 13% 15%);
+  --secondary-foreground: hsl(35 25% 95%);
+  --muted: hsl(220 13% 15%);
+  --muted-foreground: hsl(215 20.2% 70%);
+  --accent: hsl(220 13% 15%);
+  --accent-foreground: hsl(35 25% 95%);
+  --destructive: hsl(0 62.8% 50%);
+  --destructive-foreground: hsl(35 25% 95%);
+  --border: hsl(220 13% 18%);
+  --input: hsl(220 13% 15%);
   --ring: hsl(224.3 76.3% 94.1%);
   --chart-1: hsl(217.2 91.2% 59.8%);
   --chart-2: hsl(159.7826 100% 36.0784%);
@@ -116,19 +116,54 @@
     }
     
     .password-card {
-      @apply p-4;
+      @apply p-3;
     }
 
-    .password-card .flex {
-      @apply flex-col space-x-0 space-y-2;
+    .password-card .record-info {
+      @apply mb-4;
     }
 
-    .password-card .lg\:flex-row {
-      @apply flex-col;
+    .password-card .record-actions {
+      @apply flex-row justify-start gap-2;
     }
 
-    .password-card .lg\:items-center {
-      @apply items-start;
+    .password-card .record-actions .btn-mobile {
+      @apply px-3 py-2 text-sm;
+    }
+
+    .password-field-mobile {
+      @apply flex flex-col space-y-2;
+    }
+
+    .password-field-mobile .password-value {
+      @apply text-sm font-mono break-all;
+    }
+
+    .record-meta-mobile {
+      @apply text-xs text-muted-foreground mt-2;
+    }
+  }
+
+  /* Enhanced mobile responsiveness */
+  @media (max-width: 480px) {
+    .password-card {
+      @apply p-2 rounded-lg;
+    }
+
+    .dashboard-header {
+      @apply px-4 py-6;
+    }
+
+    .search-sort-container {
+      @apply flex-col gap-3;
+    }
+
+    .mobile-button-group {
+      @apply flex flex-col gap-2;
+    }
+
+    .mobile-button-group .btn {
+      @apply w-full justify-center;
     }
   }
 

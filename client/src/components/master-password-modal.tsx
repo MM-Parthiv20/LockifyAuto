@@ -55,7 +55,7 @@ export function MasterPasswordModal({ isOpen, onSuccess, onCancel }: MasterPassw
 
   return (
     <Dialog open={isOpen} onOpenChange={handleCancel}>
-      <DialogContent className="sm:max-w-md" data-testid="modal-master-password">
+      <DialogContent className="sm:max-w-md" data-testid="modal-master-password" aria-describedby="master-password-description">
         <DialogHeader className="text-center space-y-4">
           <div className="bg-primary rounded-lg p-3 w-fit mx-auto">
             <Shield className="w-8 h-8 text-primary-foreground" />
@@ -63,7 +63,7 @@ export function MasterPasswordModal({ isOpen, onSuccess, onCancel }: MasterPassw
           <DialogTitle data-testid="text-master-password-title">
             Enter Master Password
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <p id="master-password-description" className="text-sm text-muted-foreground">
             Please enter your master password to access your stored records
           </p>
         </DialogHeader>

@@ -2,9 +2,18 @@
 
 This is a full-stack password manager application called "Lockify Auto" built with React, Express.js, and PostgreSQL. The application allows users to securely register, login, and manage their password records with strong password validation and encryption. It features a modern UI built with shadcn/ui components and Tailwind CSS, with comprehensive CRUD operations for password management.
 
+## Recent Updates (August 27, 2025)
+- **Mobile UI Improvements**: Enhanced mobile responsiveness for password record cards with improved spacing, button sizing, and layout adaptation for small screens
+- **Custom Theme Implementation**: Off-white (hsl(35 25% 97%)) background for light mode and off-black (hsl(220 13% 8%)) background for dark mode with matching color scheme adjustments
+- **Accessibility Fixes**: Added aria-describedby attributes to dialog components to resolve accessibility warnings
+- **Enhanced Mobile Navigation**: Improved search and sort container layout, button groups, and action buttons for better mobile experience
+
 # User Preferences
 
-Preferred communication style: Simple, everyday language.
+- Preferred communication style: Simple, everyday language.
+- Theme preference: Off-white and off-black theme for dark mode
+- Design preference: Compact and simple mobile UI with consistent icons and font styles
+- UI focus: Enhanced mobile responsiveness for password record cards
 
 # System Architecture
 

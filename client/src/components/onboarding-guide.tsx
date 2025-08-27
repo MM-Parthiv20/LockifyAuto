@@ -62,7 +62,7 @@ export function OnboardingGuide({ isOpen, onComplete }: OnboardingGuideProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-lg" data-testid="modal-onboarding">
+      <DialogContent className="sm:max-w-lg" data-testid="modal-onboarding" aria-describedby="onboarding-description">
         <DialogHeader className="text-center space-y-4">
           <div className="bg-primary rounded-lg p-3 w-fit mx-auto">
             <Icon className="w-8 h-8 text-primary-foreground" />
@@ -70,7 +70,7 @@ export function OnboardingGuide({ isOpen, onComplete }: OnboardingGuideProps) {
           <DialogTitle data-testid="text-onboarding-title">
             {currentStepData.title}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <p id="onboarding-description" className="text-sm text-muted-foreground">
             {currentStepData.description}
           </p>
         </DialogHeader>

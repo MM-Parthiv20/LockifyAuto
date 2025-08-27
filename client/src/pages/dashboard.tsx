@@ -202,45 +202,47 @@ export default function Dashboard() {
             </div>
             
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="mobile-button-group flex flex-col sm:flex-row gap-2">
               <Button 
                 onClick={() => setIsPasswordGeneratorOpen(true)}
                 variant="outline"
-                className="flex items-center space-x-2"
+                className="btn flex items-center justify-center space-x-2"
                 data-testid="button-password-generator"
               >
-                <Key className="w-5 h-5" />
-                <span className="hidden sm:inline">Password Generator</span>
-                <span className="sm:hidden">Generate</span>
+                <Key className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-sm sm:text-base">
+                  <span className="hidden sm:inline">Password Generator</span>
+                  <span className="sm:hidden">Generate</span>
+                </span>
               </Button>
               <Button 
                 onClick={handleAddRecord}
-                className="flex items-center space-x-2"
+                className="btn flex items-center justify-center space-x-2"
                 data-testid="button-add-record"
               >
-                <Plus className="w-5 h-5" />
-                <span>Add Record</span>
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-sm sm:text-base">Add Record</span>
               </Button>
             </div>
           </div>
           
           {/* Search and Sort */}
-          <div className="mt-6 flex flex-col sm:flex-row gap-4">
+          <div className="search-sort-container mt-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Search by email or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-9 sm:pl-10 text-sm sm:text-base"
                 data-testid="input-search"
               />
             </div>
             <div className="flex gap-2">
               <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-                <SelectTrigger className="w-[180px]" data-testid="select-sort">
-                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sort">
+                  <ArrowUpDown className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                   <SelectValue placeholder="Sort by..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -271,13 +273,14 @@ export default function Dashboard() {
                 }
               </p>
               {records.length === 0 && (
-                <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <Button onClick={handleAddRecord} data-testid="button-add-first-record">
+                <div className="mobile-button-group flex flex-col sm:flex-row gap-2 justify-center">
+                  <Button onClick={handleAddRecord} className="btn" data-testid="button-add-first-record">
                     Add Your First Record
                   </Button>
                   <Button 
                     variant="outline" 
                     onClick={() => setIsPasswordGeneratorOpen(true)}
+                    className="btn"
                     data-testid="button-try-generator"
                   >
                     Try Password Generator

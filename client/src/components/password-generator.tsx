@@ -99,7 +99,7 @@ export function PasswordGenerator({ isOpen, onClose, onPasswordSelect }: Passwor
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg" data-testid="modal-password-generator">
+      <DialogContent className="sm:max-w-lg" data-testid="modal-password-generator" aria-describedby="generator-description">
         <DialogHeader className="space-y-4">
           <div className="flex items-center space-x-3">
             <div className="bg-primary rounded-lg p-2">
@@ -107,7 +107,7 @@ export function PasswordGenerator({ isOpen, onClose, onPasswordSelect }: Passwor
             </div>
             <DialogTitle data-testid="text-generator-title">Password Generator</DialogTitle>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p id="generator-description" className="text-sm text-muted-foreground">
             Generate a strong, random password with your preferred settings
           </p>
         </DialogHeader>
