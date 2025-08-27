@@ -7,7 +7,6 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  masterPassword: text("master_password").notNull(),
   hasCompletedOnboarding: boolean("has_completed_onboarding").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -33,12 +32,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
-  masterPassword: z.string()
-    .min(12, "Master password must be at least 12 characters")
-    .regex(/[A-Z]/, "Master password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Master password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Master password must contain at least one number")
-    .regex(/[^A-Za-z0-9]/, "Master password must contain at least one special character"),
 });
 
 export const insertPasswordRecordSchema = createInsertSchema(passwordRecords).pick({
@@ -61,9 +54,7 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const masterPasswordSchema = z.object({
-  masterPassword: z.string().min(1, "Master password is required"),
-});
+
 
 export const onboardingCompleteSchema = z.object({
   hasCompletedOnboarding: z.boolean(),
@@ -74,5 +65,5 @@ export type User = typeof users.$inferSelect;
 export type InsertPasswordRecord = z.infer<typeof insertPasswordRecordSchema>;
 export type PasswordRecord = typeof passwordRecords.$inferSelect;
 export type LoginData = z.infer<typeof loginSchema>;
-export type MasterPasswordData = z.infer<typeof masterPasswordSchema>;
+
 export type OnboardingData = z.infer<typeof onboardingCompleteSchema>;

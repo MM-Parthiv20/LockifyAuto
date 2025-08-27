@@ -116,38 +116,7 @@
     }
     
     .password-card {
-      @apply p-3;
-    }
-
-    .password-card .record-info {
-      @apply mb-4;
-    }
-
-    .password-card .record-actions {
-      @apply flex-row justify-start gap-2;
-    }
-
-    .password-card .record-actions .btn-mobile {
-      @apply px-3 py-2 text-sm;
-    }
-
-    .password-field-mobile {
-      @apply flex flex-col space-y-2;
-    }
-
-    .password-field-mobile .password-value {
-      @apply text-sm font-mono break-all;
-    }
-
-    .record-meta-mobile {
-      @apply text-xs text-muted-foreground mt-2;
-    }
-  }
-
-  /* Enhanced mobile responsiveness */
-  @media (max-width: 480px) {
-    .password-card {
-      @apply p-2 rounded-lg;
+      @apply p-2.5;
     }
 
     .dashboard-header {
@@ -164,6 +133,21 @@
 
     .mobile-button-group .btn {
       @apply w-full justify-center;
+    }
+  }
+
+  /* Enhanced mobile compactness */
+  @media (max-width: 480px) {
+    .password-card {
+      @apply p-2 space-y-2;
+    }
+    
+    .password-card .space-y-3 > * + * {
+      @apply mt-2;
+    }
+    
+    .password-card .space-y-1 > * + * {
+      @apply mt-1;
     }
   }
 

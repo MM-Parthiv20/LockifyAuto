@@ -9,7 +9,7 @@ import { PasswordRecord } from "@shared/schema";
 import { PasswordRecordCard } from "@/components/password-record-card";
 import { RecordModal } from "@/components/record-modal";
 import { DeleteModal } from "@/components/delete-modal";
-import { MasterPasswordModal } from "@/components/master-password-modal";
+
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { PasswordGenerator } from "@/components/password-generator";
 import { Shield, Plus, Search, Filter, Moon, Sun, LogOut, Key, ArrowUpDown, Calendar } from "lucide-react";
@@ -23,24 +23,21 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isMasterPasswordModalOpen, setIsMasterPasswordModalOpen] = useState(true);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PasswordRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [isUnlocked, setIsUnlocked] = useState(false);
 
   const { data: records = [], isLoading } = useQuery<PasswordRecord[]>({
     queryKey: ["/api/records"],
-    enabled: isUnlocked,
   });
 
   // Check onboarding status
   useEffect(() => {
-    if (user && !user.hasCompletedOnboarding && isUnlocked) {
+    if (user && !user.hasCompletedOnboarding) {
       setIsOnboardingOpen(true);
     }
-  }, [user, isUnlocked]);
+  }, [user]);
 
   const filteredAndSortedRecords = (() => {
     let filtered = records.filter(record =>
@@ -84,14 +81,7 @@ export default function Dashboard() {
     setIsDeleteModalOpen(true);
   };
 
-  const handleMasterPasswordSuccess = () => {
-    setIsMasterPasswordModalOpen(false);
-    setIsUnlocked(true);
-  };
 
-  const handleMasterPasswordCancel = () => {
-    logout();
-  };
 
   const handleOnboardingComplete = async () => {
     try {
@@ -111,20 +101,7 @@ export default function Dashboard() {
     }
   };
 
-  if (!isUnlocked) {
-    return (
-      <>
-        <MasterPasswordModal
-          isOpen={isMasterPasswordModalOpen}
-          onSuccess={handleMasterPasswordSuccess}
-          onCancel={handleMasterPasswordCancel}
-        />
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="text-lg text-muted-foreground">Please enter your master password...</div>
-        </div>
-      </>
-    );
-  }
+
 
   if (isLoading) {
     return (

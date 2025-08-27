@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertPasswordRecordSchema, loginSchema, masterPasswordSchema, onboardingCompleteSchema } from "@shared/schema";
+import { insertUserSchema, insertPasswordRecordSchema, loginSchema, onboardingCompleteSchema } from "@shared/schema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
@@ -90,21 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Master password verification
-  app.post("/api/auth/verify-master", authenticateToken, async (req: any, res) => {
-    try {
-      const { masterPassword } = masterPasswordSchema.parse(req.body);
-      const isValid = await storage.verifyMasterPassword(req.user.userId, masterPassword);
-      
-      if (!isValid) {
-        return res.status(401).json({ message: "Invalid master password" });
-      }
 
-      res.json({ success: true });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid input data" });
-    }
-  });
 
   // Update onboarding status
   app.put("/api/auth/onboarding", authenticateToken, async (req: any, res) => {

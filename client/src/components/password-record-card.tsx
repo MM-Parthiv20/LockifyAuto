@@ -40,109 +40,108 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
   };
 
   return (
-    <Card className="password-card p-4 sm:p-6 hover:shadow-md transition-shadow" data-testid={`card-record-${record.id}`}>
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-start lg:justify-between lg:space-y-0 lg:gap-6">
-        {/* Record Info */}
-        <div className="record-info flex-1 space-y-3 sm:space-y-4">
-          {/* Email Field */}
-          <div className="space-y-2">
-            <label className="text-xs sm:text-sm font-medium text-muted-foreground">Email</label>
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-              <div className="flex-1 bg-muted rounded-lg px-3 py-2 sm:px-4 sm:py-3 font-mono text-sm break-all" data-testid={`text-email-${record.id}`}>
-                {record.email}
+    <Card className="password-card p-3 sm:p-4 hover:shadow-md transition-shadow" data-testid={`card-record-${record.id}`}>
+      {/* Compact Layout */}
+      <div className="space-y-3">
+        {/* Email Field - Compact */}
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Email</label>
+          <div className="flex items-center space-x-2">
+            <div className="flex-1 bg-muted rounded px-3 py-2 font-mono text-sm break-all min-w-0" data-testid={`text-email-${record.id}`}>
+              {record.email}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => copyToClipboard(record.email, "Email")}
+              className="p-2 h-8 w-8 flex-shrink-0"
+              title="Copy email"
+              data-testid={`button-copy-email-${record.id}`}
+            >
+              <Copy className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+        
+        {/* Password Field - Compact */}
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Password</label>
+          <div className="flex items-center space-x-2">
+            <div className="flex-1 bg-muted rounded px-3 py-2 font-mono text-sm break-all min-w-0" data-testid={`text-password-${record.id}`}>
+              {showPassword ? record.password : "••••••••••••"}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowPassword(!showPassword)}
+              className="p-2 h-8 w-8 flex-shrink-0"
+              title="Show/hide password"
+              data-testid={`button-toggle-password-${record.id}`}
+            >
+              {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => copyToClipboard(record.password, "Password")}
+              className="p-2 h-8 w-8 flex-shrink-0"
+              title="Copy password"
+              data-testid={`button-copy-password-${record.id}`}
+            >
+              <Copy className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+        
+        {/* Description Field - Compact (only if exists) */}
+        {record.description && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Description</label>
+            <div className="flex items-start space-x-2">
+              <div className="flex-1 bg-muted rounded px-3 py-2 text-sm break-words min-w-0" data-testid={`text-description-${record.id}`}>
+                {record.description}
               </div>
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
-                onClick={() => copyToClipboard(record.email, "Email")}
-                className="px-2 py-2 self-start sm:self-auto flex-shrink-0"
-                title="Copy email"
-                data-testid={`button-copy-email-${record.id}`}
+                onClick={() => copyToClipboard(record.description!, "Description")}
+                className="p-2 h-8 w-8 flex-shrink-0 mt-0"
+                title="Copy description"
+                data-testid={`button-copy-description-${record.id}`}
               >
-                <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="ml-1 text-xs sm:hidden">Copy</span>
+                <Copy className="w-3 h-3" />
               </Button>
             </div>
           </div>
-          
-          {/* Password Field */}
-          <div className="password-field-mobile space-y-2">
-            <label className="text-xs sm:text-sm font-medium text-muted-foreground">Password</label>
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-              <div className="password-value flex-1 bg-muted rounded-lg px-3 py-2 sm:px-4 sm:py-3 font-mono text-sm break-all" data-testid={`text-password-${record.id}`}>
-                {showPassword ? record.password : "••••••••••••"}
-              </div>
-              <div className="flex space-x-2 self-start sm:self-auto flex-shrink-0">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="px-2 py-2"
-                  title="Show/hide password"
-                  data-testid={`button-toggle-password-${record.id}`}
-                >
-                  {showPassword ? <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" /> : <Eye className="w-3 h-3 sm:w-4 sm:h-4" />}
-                  <span className="ml-1 text-xs sm:hidden">{showPassword ? "Hide" : "Show"}</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => copyToClipboard(record.password, "Password")}
-                  className="px-2 py-2"
-                  title="Copy password"
-                  data-testid={`button-copy-password-${record.id}`}
-                >
-                  <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="ml-1 text-xs sm:hidden">Copy</span>
-                </Button>
-              </div>
-            </div>
+        )}
+
+        {/* Action Buttons & Metadata - Single Row */}
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div className="text-xs text-muted-foreground">
+            <span data-testid={`text-created-${record.id}`}>
+              {formatDate(record.createdAt)}
+            </span>
           </div>
-          
-          {/* Description Field */}
-          {record.description && (
-            <div className="space-y-2">
-              <label className="text-xs sm:text-sm font-medium text-muted-foreground">Description</label>
-              <div className="flex flex-col sm:flex-row sm:items-start space-y-2 sm:space-y-0 sm:space-x-3">
-                <div className="flex-1 bg-muted rounded-lg px-3 py-2 sm:px-4 sm:py-3 text-sm break-words" data-testid={`text-description-${record.id}`}>
-                  {record.description}
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => copyToClipboard(record.description!, "Description")}
-                  className="px-2 py-2 self-start sm:self-auto flex-shrink-0"
-                  title="Copy description"
-                  data-testid={`button-copy-description-${record.id}`}
-                >
-                  <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="ml-1 text-xs sm:hidden">Copy</span>
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Actions */}
-        <div className="record-actions flex flex-row lg:flex-col gap-2 pt-4 lg:pt-0 border-t lg:border-t-0 border-border lg:border-l lg:pl-6">
-          <Button
-            variant="outline"
-            className="btn-mobile flex-1 lg:flex-none flex items-center justify-center space-x-2"
-            onClick={() => onEdit(record)}
-            data-testid={`button-edit-${record.id}`}
-          >
-            <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm">Edit</span>
-          </Button>
-          <Button
-            variant="destructive"
-            className="btn-mobile flex-1 lg:flex-none flex items-center justify-center space-x-2"
-            onClick={() => onDelete(record)}
-            data-testid={`button-delete-${record.id}`}
-          >
-            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm">Delete</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => onEdit(record)}
+              data-testid={`button-edit-${record.id}`}
+            >
+              <Edit className="w-3 h-3" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => onDelete(record)}
+              data-testid={`button-delete-${record.id}`}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
         </div>
       </div>
       
