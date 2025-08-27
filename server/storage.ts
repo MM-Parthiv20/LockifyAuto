@@ -7,6 +7,8 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  verifyMasterPassword(userId: string, masterPassword: string): Promise<boolean>;
+  updateUserOnboarding(userId: string, hasCompletedOnboarding: boolean): Promise<User | undefined>;
   
   // Password record methods
   getPasswordRecords(userId: string): Promise<PasswordRecord[]>;
@@ -38,10 +40,13 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    const hashedMasterPassword = await bcrypt.hash(insertUser.masterPassword, 10);
     const user: User = { 
       ...insertUser, 
       id, 
       password: hashedPassword,
+      masterPassword: hashedMasterPassword,
+      hasCompletedOnboarding: false,
       createdAt: new Date()
     };
     this.users.set(id, user);
@@ -100,6 +105,24 @@ export class MemStorage implements IStorage {
       return false;
     }
     return this.passwordRecords.delete(id);
+  }
+
+  async verifyMasterPassword(userId: string, masterPassword: string): Promise<boolean> {
+    const user = this.users.get(userId);
+    if (!user) return false;
+    return await bcrypt.compare(masterPassword, user.masterPassword);
+  }
+
+  async updateUserOnboarding(userId: string, hasCompletedOnboarding: boolean): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      hasCompletedOnboarding,
+    };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
   }
 }
 

@@ -5,6 +5,7 @@ import { apiRequest } from './queryClient';
 interface User {
   id: string;
   username: string;
+  hasCompletedOnboarding?: boolean;
 }
 
 interface AuthResponse {
@@ -65,7 +66,19 @@ export function useAuth() {
     setToken(null);
     localStorage.removeItem(TOKEN_KEY);
     queryClient.clear();
+    // Force reload to redirect to login page
+    window.location.reload();
   };
+
+  const updateOnboardingStatus = useMutation({
+    mutationFn: async (hasCompleted: boolean) => {
+      const res = await apiRequest("PUT", "/api/auth/onboarding", { hasCompletedOnboarding: hasCompleted });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+  });
 
   // Set up axios interceptor for authenticated requests
   useEffect(() => {
@@ -89,6 +102,7 @@ export function useAuth() {
     login: loginMutation.mutateAsync,
     register: registerMutation.mutateAsync,
     logout,
+    updateOnboardingStatus: updateOnboardingStatus.mutateAsync,
     isLoginLoading: loginMutation.isPending,
     isRegisterLoading: registerMutation.isPending,
   };

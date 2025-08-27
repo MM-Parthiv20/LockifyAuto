@@ -1,32 +1,71 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/components/theme-provider";
 import { PasswordRecord } from "@shared/schema";
 import { PasswordRecordCard } from "@/components/password-record-card";
 import { RecordModal } from "@/components/record-modal";
 import { DeleteModal } from "@/components/delete-modal";
-import { Shield, Plus, Search, Filter, Moon, Sun, LogOut } from "lucide-react";
+import { MasterPasswordModal } from "@/components/master-password-modal";
+import { OnboardingGuide } from "@/components/onboarding-guide";
+import { PasswordGenerator } from "@/components/password-generator";
+import { Shield, Plus, Search, Filter, Moon, Sun, LogOut, Key, ArrowUpDown, Calendar } from "lucide-react";
+
+type SortOption = "newest" | "oldest" | "email" | "updated";
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateOnboardingStatus } = useAuth();
   const { theme, setTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isMasterPasswordModalOpen, setIsMasterPasswordModalOpen] = useState(true);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PasswordRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
   const { data: records = [], isLoading } = useQuery<PasswordRecord[]>({
     queryKey: ["/api/records"],
+    enabled: isUnlocked,
   });
 
-  const filteredRecords = records.filter(record =>
-    record.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-  );
+  // Check onboarding status
+  useEffect(() => {
+    if (user && !user.hasCompletedOnboarding && isUnlocked) {
+      setIsOnboardingOpen(true);
+    }
+  }, [user, isUnlocked]);
+
+  const filteredAndSortedRecords = (() => {
+    let filtered = records.filter(record =>
+      record.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    );
+
+    // Sort records
+    switch (sortBy) {
+      case "newest":
+        filtered = [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case "oldest":
+        filtered = [...filtered].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        break;
+      case "email":
+        filtered = [...filtered].sort((a, b) => a.email.localeCompare(b.email));
+        break;
+      case "updated":
+        filtered = [...filtered].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        break;
+    }
+
+    return filtered;
+  })();
 
   const handleAddRecord = () => {
     setSelectedRecord(null);
@@ -44,6 +83,48 @@ export default function Dashboard() {
     setSelectedRecord(record);
     setIsDeleteModalOpen(true);
   };
+
+  const handleMasterPasswordSuccess = () => {
+    setIsMasterPasswordModalOpen(false);
+    setIsUnlocked(true);
+  };
+
+  const handleMasterPasswordCancel = () => {
+    logout();
+  };
+
+  const handleOnboardingComplete = async () => {
+    try {
+      await updateOnboardingStatus(true);
+      setIsOnboardingOpen(false);
+    } catch (error) {
+      console.error("Failed to update onboarding status:", error);
+    }
+  };
+
+  const getSortLabel = (sort: SortOption) => {
+    switch (sort) {
+      case "newest": return "Newest First";
+      case "oldest": return "Oldest First";
+      case "email": return "Email A-Z";
+      case "updated": return "Recently Updated";
+    }
+  };
+
+  if (!isUnlocked) {
+    return (
+      <>
+        <MasterPasswordModal
+          isOpen={isMasterPasswordModalOpen}
+          onSuccess={handleMasterPasswordSuccess}
+          onCancel={handleMasterPasswordCancel}
+        />
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-lg text-muted-foreground">Please enter your master password...</div>
+        </div>
+      </>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -120,40 +201,62 @@ export default function Dashboard() {
               </p>
             </div>
             
-            {/* Add New Record Button */}
-            <Button 
-              onClick={handleAddRecord}
-              className="flex items-center space-x-2"
-              data-testid="button-add-record"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add New Record</span>
-            </Button>
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button 
+                onClick={() => setIsPasswordGeneratorOpen(true)}
+                variant="outline"
+                className="flex items-center space-x-2"
+                data-testid="button-password-generator"
+              >
+                <Key className="w-5 h-5" />
+                <span className="hidden sm:inline">Password Generator</span>
+                <span className="sm:hidden">Generate</span>
+              </Button>
+              <Button 
+                onClick={handleAddRecord}
+                className="flex items-center space-x-2"
+                data-testid="button-add-record"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add Record</span>
+              </Button>
+            </div>
           </div>
           
-          {/* Search and Filter */}
+          {/* Search and Sort */}
           <div className="mt-6 flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search records..."
+                placeholder="Search by email or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
                 data-testid="input-search"
               />
             </div>
-            <Button variant="secondary" className="flex items-center space-x-2" data-testid="button-filter">
-              <Filter className="w-5 h-5" />
-              <span>Filter</span>
-            </Button>
+            <div className="flex gap-2">
+              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                <SelectTrigger className="w-[180px]" data-testid="select-sort">
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest" data-testid="sort-newest">Newest First</SelectItem>
+                  <SelectItem value="oldest" data-testid="sort-oldest">Oldest First</SelectItem>
+                  <SelectItem value="email" data-testid="sort-email">Email A-Z</SelectItem>
+                  <SelectItem value="updated" data-testid="sort-updated">Recently Updated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
         {/* Records Grid */}
-        <div className="space-y-6">
-          {filteredRecords.length === 0 ? (
+        <div className="space-y-4">
+          {filteredAndSortedRecords.length === 0 ? (
             <div className="text-center py-16">
               <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
                 <Shield className="w-12 h-12 text-muted-foreground" />
@@ -164,24 +267,43 @@ export default function Dashboard() {
               <p className="text-muted-foreground mb-6">
                 {records.length === 0 
                   ? "Get started by adding your first email and password record"
-                  : "Try adjusting your search terms"
+                  : "Try adjusting your search terms or sorting options"
                 }
               </p>
               {records.length === 0 && (
-                <Button onClick={handleAddRecord} data-testid="button-add-first-record">
-                  Add Your First Record
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                  <Button onClick={handleAddRecord} data-testid="button-add-first-record">
+                    Add Your First Record
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsPasswordGeneratorOpen(true)}
+                    data-testid="button-try-generator"
+                  >
+                    Try Password Generator
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
-            filteredRecords.map((record) => (
-              <PasswordRecordCard
-                key={record.id}
-                record={record}
-                onEdit={handleEditRecord}
-                onDelete={handleDeleteRecord}
-              />
-            ))
+            <>
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span data-testid="text-records-count">
+                  {filteredAndSortedRecords.length} of {records.length} records
+                </span>
+                <span data-testid="text-sort-info">
+                  Sorted by {getSortLabel(sortBy)}
+                </span>
+              </div>
+              {filteredAndSortedRecords.map((record) => (
+                <PasswordRecordCard
+                  key={record.id}
+                  record={record}
+                  onEdit={handleEditRecord}
+                  onDelete={handleDeleteRecord}
+                />
+              ))}
+            </>
           )}
         </div>
       </main>
@@ -198,6 +320,16 @@ export default function Dashboard() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         record={selectedRecord}
+      />
+
+      <OnboardingGuide
+        isOpen={isOnboardingOpen}
+        onComplete={handleOnboardingComplete}
+      />
+
+      <PasswordGenerator
+        isOpen={isPasswordGeneratorOpen}
+        onClose={() => setIsPasswordGeneratorOpen(false)}
       />
     </div>
   );

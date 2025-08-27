@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Shield, Eye, EyeOff, Check, X } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { validatePassword } from "@/lib/password-validation";
+import { validateMasterPassword } from "@/lib/master-password-validation";
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -16,6 +17,7 @@ export default function Register() {
   const [formData, setFormData] = useState({
     username: "",
     password: "",
+    masterPassword: "",
   });
 
   const { register, isRegisterLoading } = useAuth();
@@ -23,6 +25,7 @@ export default function Register() {
   const { theme, setTheme } = useTheme();
 
   const passwordValidation = validatePassword(formData.password);
+  const masterPasswordValidation = validateMasterPassword(formData.masterPassword);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +34,15 @@ export default function Register() {
       toast({
         title: "Invalid password",
         description: "Please ensure your password meets all requirements",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!masterPasswordValidation.isValid) {
+      toast({
+        title: "Invalid master password",
+        description: "Please ensure your master password meets all requirements (minimum 12 characters)",
         variant: "destructive",
       });
       return;
@@ -175,10 +187,78 @@ export default function Register() {
               )}
             </div>
 
+            {/* Master Password Field */}
+            <div className="space-y-2">
+              <Label htmlFor="masterPassword">Master Password</Label>
+              <div className="relative">
+                <Input
+                  id="masterPassword"
+                  name="masterPassword"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create a master password (min 12 chars)"
+                  value={formData.masterPassword}
+                  onChange={handleChange}
+                  required
+                  data-testid="input-master-password"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This master password will unlock your stored records after login
+              </p>
+              
+              {formData.masterPassword && (
+                <div className="text-xs space-y-1 mt-2">
+                  <p className="font-medium text-muted-foreground">Master password must contain:</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    <div className="flex items-center space-x-1">
+                      {masterPasswordValidation.checks.length ? (
+                        <Check className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <X className="h-3 w-3 text-red-600" />
+                      )}
+                      <span className={masterPasswordValidation.checks.length ? "text-green-600" : "text-red-600"}>
+                        12+ characters
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      {masterPasswordValidation.checks.uppercase ? (
+                        <Check className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <X className="h-3 w-3 text-red-600" />
+                      )}
+                      <span className={masterPasswordValidation.checks.uppercase ? "text-green-600" : "text-red-600"}>
+                        Uppercase letter
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      {masterPasswordValidation.checks.lowercase ? (
+                        <Check className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <X className="h-3 w-3 text-red-600" />
+                      )}
+                      <span className={masterPasswordValidation.checks.lowercase ? "text-green-600" : "text-red-600"}>
+                        Lowercase letter
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      {masterPasswordValidation.checks.number && masterPasswordValidation.checks.special ? (
+                        <Check className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <X className="h-3 w-3 text-red-600" />
+                      )}
+                      <span className={(masterPasswordValidation.checks.number && masterPasswordValidation.checks.special) ? "text-green-600" : "text-red-600"}>
+                        Number & symbol
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isRegisterLoading || !passwordValidation.isValid}
+              disabled={isRegisterLoading || !passwordValidation.isValid || !masterPasswordValidation.isValid}
               data-testid="button-register"
             >
               {isRegisterLoading ? "Creating account..." : "Create account"}

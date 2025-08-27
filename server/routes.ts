@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertPasswordRecordSchema, loginSchema } from "@shared/schema";
+import { insertUserSchema, insertPasswordRecordSchema, loginSchema, masterPasswordSchema, onboardingCompleteSchema } from "@shared/schema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
@@ -43,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ 
-        user: { id: user.id, username: user.username }, 
+        user: { id: user.id, username: user.username, hasCompletedOnboarding: user.hasCompletedOnboarding }, 
         token 
       });
     } catch (error) {
@@ -70,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ 
-        user: { id: user.id, username: user.username }, 
+        user: { id: user.id, username: user.username, hasCompletedOnboarding: user.hasCompletedOnboarding }, 
         token 
       });
     } catch (error) {
@@ -84,9 +84,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json({ id: user.id, username: user.username });
+      res.json({ id: user.id, username: user.username, hasCompletedOnboarding: user.hasCompletedOnboarding });
     } catch (error) {
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Master password verification
+  app.post("/api/auth/verify-master", authenticateToken, async (req: any, res) => {
+    try {
+      const { masterPassword } = masterPasswordSchema.parse(req.body);
+      const isValid = await storage.verifyMasterPassword(req.user.userId, masterPassword);
+      
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid master password" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid input data" });
+    }
+  });
+
+  // Update onboarding status
+  app.put("/api/auth/onboarding", authenticateToken, async (req: any, res) => {
+    try {
+      const { hasCompletedOnboarding } = onboardingCompleteSchema.parse(req.body);
+      const updatedUser = await storage.updateUserOnboarding(req.user.userId, hasCompletedOnboarding);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ hasCompletedOnboarding: updatedUser.hasCompletedOnboarding });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid input data" });
     }
   });
 

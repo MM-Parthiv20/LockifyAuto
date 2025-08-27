@@ -40,7 +40,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
   };
 
   return (
-    <Card className="p-6 hover:shadow-md transition-shadow" data-testid={`card-record-${record.id}`}>
+    <Card className="password-card p-6 hover:shadow-md transition-shadow" data-testid={`card-record-${record.id}`}>
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         {/* Record Info */}
         <div className="flex-1 space-y-4">

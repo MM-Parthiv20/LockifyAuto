@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PasswordRecord, insertPasswordRecordSchema } from "@shared/schema";
 import { validatePassword } from "@/lib/password-validation";
-import { Eye, EyeOff, Check, X } from "lucide-react";
+import { PasswordGenerator } from "@/components/password-generator";
+import { Eye, EyeOff, Check, X, Key } from "lucide-react";
 
 interface RecordModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface RecordModalProps {
 
 export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -123,6 +125,13 @@ export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps)
     }));
   };
 
+  const handlePasswordSelect = (generatedPassword: string) => {
+    setFormData(prev => ({
+      ...prev,
+      password: generatedPassword,
+    }));
+  };
+
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
   return (
@@ -153,7 +162,20 @@ export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps)
           
           {/* Password Field */}
           <div className="space-y-2">
-            <Label htmlFor="password">Password *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsPasswordGeneratorOpen(true)}
+                className="text-xs text-primary hover:text-primary"
+                data-testid="button-open-generator"
+              >
+                <Key className="h-3 w-3 mr-1" />
+                Generate
+              </Button>
+            </div>
             <div className="relative">
               <Input
                 id="password"
@@ -270,6 +292,12 @@ export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps)
           </div>
         </form>
       </DialogContent>
+      
+      <PasswordGenerator
+        isOpen={isPasswordGeneratorOpen}
+        onClose={() => setIsPasswordGeneratorOpen(false)}
+        onPasswordSelect={handlePasswordSelect}
+      />
     </Dialog>
   );
 }
