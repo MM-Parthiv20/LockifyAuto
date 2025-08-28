@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth } from "@/lib/auth";
+// Auth removed for open app
 import { useTheme } from "@/components/theme-provider";
 import { PasswordRecord } from "@shared/schema";
 import { PasswordRecordCard } from "@/components/password-record-card";
@@ -12,12 +12,12 @@ import { DeleteModal } from "@/components/delete-modal";
 
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Shield, Plus, Search, Filter, Moon, Sun, LogOut, Key, ArrowUpDown, Calendar } from "lucide-react";
+import { Shield, Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar } from "lucide-react";
+import LoadingSpinner from "@/components/loading-spinner";
 
 type SortOption = "newest" | "oldest" | "email" | "updated";
 
 export default function Dashboard() {
-  const { user, logout, updateOnboardingStatus } = useAuth();
   const { theme, setTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
@@ -32,12 +32,13 @@ export default function Dashboard() {
     queryKey: ["/api/records"],
   });
 
-  // Check onboarding status
+  // Open onboarding once per device (localStorage flag)
   useEffect(() => {
-    if (user && !user.hasCompletedOnboarding) {
+    const seen = localStorage.getItem("lockify-onboarding-seen");
+    if (!seen) {
       setIsOnboardingOpen(true);
     }
-  }, [user]);
+  }, []);
 
   const filteredAndSortedRecords = (() => {
     let filtered = records.filter(record =>
@@ -47,18 +48,24 @@ export default function Dashboard() {
 
     // Sort records
     switch (sortBy) {
-      case "newest":
-        filtered = [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case "newest": {
+        const getTime = (d: any) => (d ? new Date(d as any).getTime() : 0);
+        filtered = [...filtered].sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
         break;
-      case "oldest":
-        filtered = [...filtered].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      }
+      case "oldest": {
+        const getTime = (d: any) => (d ? new Date(d as any).getTime() : 0);
+        filtered = [...filtered].sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt));
         break;
+      }
       case "email":
         filtered = [...filtered].sort((a, b) => a.email.localeCompare(b.email));
         break;
-      case "updated":
-        filtered = [...filtered].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      case "updated": {
+        const getTime = (d: any) => (d ? new Date(d as any).getTime() : 0);
+        filtered = [...filtered].sort((a, b) => getTime(b.updatedAt) - getTime(a.updatedAt));
         break;
+      }
     }
 
     return filtered;
@@ -81,15 +88,9 @@ export default function Dashboard() {
     setIsDeleteModalOpen(true);
   };
 
-
-
   const handleOnboardingComplete = async () => {
-    try {
-      await updateOnboardingStatus(true);
-      setIsOnboardingOpen(false);
-    } catch (error) {
-      console.error("Failed to update onboarding status:", error);
-    }
+    localStorage.setItem("lockify-onboarding-seen", "1");
+    setIsOnboardingOpen(false);
   };
 
   const getSortLabel = (sort: SortOption) => {
@@ -101,12 +102,10 @@ export default function Dashboard() {
     }
   };
 
-
-
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-lg text-muted-foreground">Loading your records...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground">
+        <LoadingSpinner colorClassName="text-primary" />
       </div>
     );
   }
@@ -138,42 +137,20 @@ export default function Dashboard() {
                 {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
               </Button>
               
-              {/* User Menu */}
-              <div className="flex items-center space-x-3">
-                <div className="hidden sm:block text-right">
-                  <p className="text-sm font-medium text-foreground" data-testid="text-username">
-                    {user?.username}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Password Manager</p>
-                </div>
-                <div className="bg-primary rounded-full w-8 h-8 flex items-center justify-center">
-                  <span className="text-primary-foreground text-sm font-medium" data-testid="text-user-initials">
-                    {user?.username?.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={logout}
-                  className="p-2"
-                  data-testid="button-logout"
-                >
-                  <LogOut className="w-5 h-5" />
-                </Button>
-              </div>
+              {/* User Menu removed for open app */}
             </div>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Dashboard Header */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-foreground">Your Passwords</h2>
-              <p className="text-muted-foreground mt-1">
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Your Passwords</h2>
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
                 Manage your email and password records securely
               </p>
             </div>
