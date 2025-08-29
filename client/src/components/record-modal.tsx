@@ -55,7 +55,12 @@ export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps)
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("POST", "/api/records", data);
+      const now = new Date().toISOString();
+      const res = await apiRequest("POST", "/api/records", {
+        ...data,
+        createdAt: now,
+        updatedAt: now,
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -77,7 +82,11 @@ export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps)
 
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("PUT", `/api/records/${record?.id}`, data);
+      const now = new Date().toISOString();
+      const res = await apiRequest("PUT", `/api/records/${record?.id}`, {
+        ...data,
+        updatedAt: now,
+      });
       return res.json();
     },
     onSuccess: () => {

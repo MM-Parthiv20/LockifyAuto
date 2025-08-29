@@ -61,7 +61,7 @@ export function OnboardingGuide({ isOpen, onComplete }: OnboardingGuideProps) {
   const Icon = currentStepData.icon;
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onComplete(); }}>
       <DialogContent className="sm:max-w-lg" data-testid="modal-onboarding" aria-describedby="onboarding-description">
         <DialogHeader className="text-center space-y-4">
           <div className="bg-primary rounded-lg p-3 w-fit mx-auto">
@@ -129,7 +129,6 @@ export function OnboardingGuide({ isOpen, onComplete }: OnboardingGuideProps) {
                 {currentStep === onboardingSteps.length - 1 ? (
                   <span className="flex items-center space-x-2">
                     <CheckCircle className="w-4 h-4" />
-                    <span>Get Started</span>
                   </span>
                 ) : (
                   "Next"

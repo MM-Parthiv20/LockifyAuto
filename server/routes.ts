@@ -7,23 +7,8 @@ import bcrypt from "bcryptjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-// Middleware to verify JWT token
-const authenticateToken = (req: any, res: any, next: any) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      return res.status(403).json({ message: 'Invalid or expired token' });
-    }
-    req.user = user;
-    next();
-  });
-};
+// Open app mode: use a default public user id for all record operations
+const DEFAULT_PUBLIC_USER_ID = "public";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -78,13 +63,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
+  app.get("/api/auth/me", async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.json({ id: user.id, username: user.username, hasCompletedOnboarding: user.hasCompletedOnboarding });
+      // Open app: no auth, return a fixed public user
+      res.json({ id: DEFAULT_PUBLIC_USER_ID, username: "Public", hasCompletedOnboarding: true });
     } catch (error) {
       res.status(500).json({ message: "Server error" });
     }
@@ -93,37 +75,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Update onboarding status
-  app.put("/api/auth/onboarding", authenticateToken, async (req: any, res) => {
+  app.put("/api/auth/onboarding", async (req: any, res) => {
     try {
       const { hasCompletedOnboarding } = onboardingCompleteSchema.parse(req.body);
-      const updatedUser = await storage.updateUserOnboarding(req.user.userId, hasCompletedOnboarding);
-      
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      res.json({ hasCompletedOnboarding: updatedUser.hasCompletedOnboarding });
+      res.json({ hasCompletedOnboarding });
     } catch (error) {
       res.status(400).json({ message: "Invalid input data" });
     }
   });
 
   // Password records routes
-  app.get("/api/records", authenticateToken, async (req: any, res) => {
+  app.get("/api/records", async (req: any, res) => {
     try {
-      const records = await storage.getPasswordRecords(req.user.userId);
+      const records = await storage.getPasswordRecords(DEFAULT_PUBLIC_USER_ID);
       res.json(records);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch records" });
     }
   });
 
-  app.post("/api/records", authenticateToken, async (req: any, res) => {
+  app.post("/api/records", async (req: any, res) => {
     try {
       const recordData = insertPasswordRecordSchema.parse(req.body);
       const record = await storage.createPasswordRecord({
         ...recordData,
-        userId: req.user.userId
+        userId: DEFAULT_PUBLIC_USER_ID
       });
       res.status(201).json(record);
     } catch (error: any) {
@@ -135,13 +111,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/records/:id", authenticateToken, async (req: any, res) => {
+  app.put("/api/records/:id", async (req: any, res) => {
     try {
       const recordData = insertPasswordRecordSchema.partial().parse(req.body);
       const updatedRecord = await storage.updatePasswordRecord(
         req.params.id, 
         recordData, 
-        req.user.userId
+        DEFAULT_PUBLIC_USER_ID
       );
       
       if (!updatedRecord) {
@@ -158,9 +134,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/records/:id", authenticateToken, async (req: any, res) => {
+  app.delete("/api/records/:id", async (req: any, res) => {
     try {
-      const deleted = await storage.deletePasswordRecord(req.params.id, req.user.userId);
+      const deleted = await storage.deletePasswordRecord(req.params.id, DEFAULT_PUBLIC_USER_ID);
       if (!deleted) {
         return res.status(404).json({ message: "Record not found" });
       }
