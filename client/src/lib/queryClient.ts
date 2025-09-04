@@ -4,16 +4,12 @@ const API_BASE = "https://68b00f193b8db1ae9c028e80.mockapi.io/lockifyAuto";
 
 function resolveUrl(url: string): string {
   if (url.startsWith("/api/")) {
-    // Map app endpoints to MockAPI resource
-    //   /api/records      -> /locifyauto
-    //   /api/records/:id  -> /locifyauto/:id
+    // Map app endpoints to MockAPI resource paths
     const after = url.replace(/^\/api\//, "");
-    if (after === "records") {
-      return API_BASE + "/locifyauto";
-    }
-    if (after.startsWith("records/")) {
-      return API_BASE + "/locifyauto/" + after.slice("records/".length);
-    }
+    if (after === "records") return API_BASE + "/locifyauto";
+    if (after.startsWith("records/")) return API_BASE + "/locifyauto/" + after.slice("records/".length);
+    if (after === "users") return API_BASE + "/users";
+    if (after.startsWith("users/")) return API_BASE + "/users/" + after.slice("users/".length);
     return API_BASE + "/" + after;
   }
   return url;

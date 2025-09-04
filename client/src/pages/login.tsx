@@ -4,38 +4,45 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff } from "lucide-react";
+import { Shield, Eye, EyeOff ,Moon, Sun} from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
+
+import { useAuth } from "@/lib/auth";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: "",
     password: "",
   });
 
-  const { login, isLoginLoading } = useAuth();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+
+    // Simulate a small delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     try {
-      await login(formData);
-      setLocation("/");
-      toast({
-        title: "Login successful",
-        description: "Welcome back to Lockify Auto!",
-      });
+      await login({ username: formData.username.trim(), password: formData.password });
+      toast({ title: "Login successful", description: "Welcome back to Lockify Auto!" });
+      // Ensure auth state is picked up app-wide
+      window.location.replace("/");
     } catch (error) {
       toast({
         title: "Login failed",
         description: "Invalid username or password",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -52,10 +59,11 @@ export default function Login() {
         <Button
           variant="ghost"
           size="sm"
+          className="p-2"
           onClick={() => setTheme(theme === "light" ? "dark" : "light")}
           data-testid="button-theme-toggle"
         >
-          {theme === "light" ? "🌙" : "☀️"}
+           {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </Button>
       </div>
       
@@ -117,10 +125,10 @@ export default function Login() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoginLoading}
+              disabled={isLoading}
               data-testid="button-login"
             >
-              {isLoginLoading ? "Signing in..." : "Sign in"}
+              {isLoading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
 

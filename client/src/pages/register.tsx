@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Check, X } from "lucide-react";
+import { Shield, Eye, EyeOff, Check, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { validatePassword } from "@/lib/password-validation";
 
@@ -40,12 +40,9 @@ export default function Register() {
 
 
     try {
-      await register(formData);
-      setLocation("/");
-      toast({
-        title: "Account created",
-        description: "Welcome to Lockify Auto!",
-      });
+      await register({ username: formData.username.trim(), password: formData.password });
+      setLocation("/login");
+      toast({ title: "Account created", description: "You can now sign in." });
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -68,10 +65,11 @@ export default function Register() {
         <Button
           variant="ghost"
           size="sm"
+          className="p-2"
           onClick={() => setTheme(theme === "light" ? "dark" : "light")}
           data-testid="button-theme-toggle"
         >
-          {theme === "light" ? "🌙" : "☀️"}
+           {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </Button>
       </div>
       
