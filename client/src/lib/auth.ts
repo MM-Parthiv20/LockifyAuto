@@ -11,6 +11,7 @@ interface User {
 
 const AUTH_KEY = 'lockify-auth';
 const DEFAULT_CREDENTIALS = { username: 'parthiv21', password: 'Parthiv2011!' };
+const AVATAR_CACHE_PREFIX = 'lockify-avatar-';
 
 export function useAuth() {
   const [auth, setAuth] = useState<{ user: User } | null>(() => {
@@ -61,7 +62,12 @@ export function useAuth() {
         credentials.username === DEFAULT_CREDENTIALS.username &&
         credentials.password === DEFAULT_CREDENTIALS.password
       ) {
-        return { id: 'default', username: credentials.username, hasCompletedOnboarding: true } as User;
+        // restore cached avatar (survives logout/login for default user)
+        let cachedAvatar: string | undefined;
+        try {
+          cachedAvatar = localStorage.getItem(AVATAR_CACHE_PREFIX + credentials.username) || undefined;
+        } catch {}
+        return { id: 'default', username: credentials.username, profileimage: cachedAvatar, hasCompletedOnboarding: true } as User;
       }
       // Otherwise, check against MockAPI users
       const res = await apiRequest('GET', '/api/users');
@@ -98,7 +104,10 @@ export function useAuth() {
     localStorage.removeItem(AUTH_KEY);
     setAuth(null);
     queryClient.clear();
-    window.location.replace('/login');
+    // No hard reload to avoid 404 in static deployments; ProtectedRoute will render Login
+    try {
+      window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
+    } catch {}
   };
 
   const updateOnboardingStatus = useMutation({
@@ -117,6 +126,11 @@ export function useAuth() {
       if (auth.user.id !== 'default') {
         await apiRequest('PUT', `/api/users/${auth.user.id}`, { profileimage });
       }
+      // Persist locally for default/demo user so it survives logout/login
+      try {
+        const usernameKey = auth.user.username || 'default';
+        localStorage.setItem(AVATAR_CACHE_PREFIX + usernameKey, profileimage);
+      } catch {}
       const updated: User = { ...auth.user, profileimage };
       setLoggedIn(updated);
       return updated;
