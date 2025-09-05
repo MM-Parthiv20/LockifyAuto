@@ -6,13 +6,14 @@ type AppLogoProps = {
 };
 
 export function AppLogo({ className }: AppLogoProps) {
+  const appLogoUrl = new URL('../../images/app-logo.svg', import.meta.url).href;
   return (
-    <span
+    <div
       aria-hidden
-      className={cn("inline-block align-middle", className)}
+      className={cn("align-middle", className)}
       style={{
-        WebkitMaskImage: 'url(/images/app-logo.svg)',
-        maskImage: 'url(/images/app-logo.svg)',
+        WebkitMaskImage: `url(${appLogoUrl})`,
+        maskImage: `url(${appLogoUrl})`,
         WebkitMaskRepeat: 'no-repeat',
         maskRepeat: 'no-repeat',
         WebkitMaskSize: 'contain',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from './queryClient';
 
@@ -27,7 +27,32 @@ export function useAuth() {
     const value = { user: { ...user, hasCompletedOnboarding: user.hasCompletedOnboarding ?? true } };
     localStorage.setItem(AUTH_KEY, JSON.stringify(value));
     setAuth(value);
+    // notify other hook instances in same tab
+    try {
+      window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
+    } catch {}
   };
+
+  // keep all components in sync with localStorage changes (cross-tab and same-tab custom event)
+  // ensures navbar avatar updates immediately when profile updates
+  React.useEffect(() => {
+    const syncFromStorage = () => {
+      try {
+        const raw = localStorage.getItem(AUTH_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        setAuth(parsed);
+      } catch {}
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === AUTH_KEY) syncFromStorage();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('lockify-auth-updated' as any, syncFromStorage as any);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('lockify-auth-updated' as any, syncFromStorage as any);
+    };
+  }, []);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
@@ -52,6 +77,14 @@ export function useAuth() {
 
   const registerMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string }) => {
+      // Check if username already exists before creating
+      const existingRes = await apiRequest('GET', '/api/users');
+      const existingUsers = (await existingRes.json()) as Array<{ id: string; username: string }>;
+      const usernameTaken = existingUsers.some((u) => u.username === userData.username);
+      if (usernameTaken) {
+        throw new Error('this user already exist');
+      }
+
       const randomId = Math.floor(Math.random() * 100) + 1;
       const profileimage = `https://avatar.iran.liara.run/public/${randomId}`;
       const res = await apiRequest('POST', '/api/users', { ...userData, profileimage });
@@ -77,6 +110,19 @@ export function useAuth() {
     },
   });
 
+  const updateProfileImageMutation = useMutation({
+    mutationFn: async (profileimage: string) => {
+      if (!auth?.user?.id) throw new Error('Missing user id');
+      // Persist to API unless default demo user
+      if (auth.user.id !== 'default') {
+        await apiRequest('PUT', `/api/users/${auth.user.id}`, { profileimage });
+      }
+      const updated: User = { ...auth.user, profileimage };
+      setLoggedIn(updated);
+      return updated;
+    },
+  });
+
   return {
     user: auth?.user ?? null,
     isLoading: false,
@@ -84,6 +130,7 @@ export function useAuth() {
     register: registerMutation.mutateAsync,
     logout,
     updateOnboardingStatus: updateOnboardingStatus.mutateAsync,
+    updateProfileImage: updateProfileImageMutation.mutateAsync,
     isLoginLoading: loginMutation.isPending,
     isRegisterLoading: registerMutation.isPending,
   };

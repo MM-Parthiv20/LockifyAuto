@@ -13,8 +13,8 @@ import { DeleteModal } from "@/components/delete-modal";
 
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar, User } from "lucide-react";
-import AppLogo from "@/components/app-logo";
+import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar, User, Loader2 } from "lucide-react";
+
 import Profile from "@/pages/profile";
 import LoadingSpinner from "@/components/loading-spinner";
 
@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [selectedRecord, setSelectedRecord] = useState<PasswordRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [showProfile, setShowProfile] = useState(false);
-
+  const [loading, setLoading] = useState(true);
   const avatarUrl = (() => {
     if (user?.profileimage) return user.profileimage;
     const seed = (user?.id || user?.username || "1").length % 100 || 1;
@@ -128,9 +128,12 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Brand */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2" onClick={() => setShowProfile(false)}>
               <div className="bg-primary/10 rounded-lg text-primary">
-                <AppLogo className="w-8 h-8" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-9 h-9" fill="currentColor">
+              <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
+              <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
+              </svg>
               </div>
               <h1 className="text-xl font-semibold text-foreground">Lockify Auto</h1>
             </div>
@@ -151,12 +154,15 @@ export default function Dashboard() {
               {/* User avatar and username */}
               {user && (
                 <div className="flex items-center gap-2 pr-1 cursor-pointer" onClick={() => setShowProfile(!showProfile)}>
+                  {isLoading && <Loader2 className="animate-spin w-8 h-8 text-muted-foreground" />}
                   <img
                     src={avatarUrl}
                     alt="avatar"
                     className="w-7 h-7 rounded-full border"
+                    onLoad={() => setLoading(false)}
+                    onError={() => setLoading(false)}
                   />
-                  <span className="hidden sm:block text-sm text-foreground">{user.username}</span>
+                  <span className="hidden sm:flex text-sm text-foreground">{user.username}</span>
                 </div>
               )}
               
@@ -165,7 +171,7 @@ export default function Dashboard() {
                 variant={showProfile ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setShowProfile(!showProfile)}
-                className="p-2 bg-primary text-primary-foreground hidden sm:flex"
+                className="hidden p-2 bg-primary text-primary-foreground"
                 data-testid="button-profile-toggle"
               >
                 <User className="w-5 h-5" />
@@ -253,7 +259,10 @@ export default function Dashboard() {
               {filteredAndSortedRecords.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 text-muted-foreground">
-                    <AppLogo className="w-12 h-12" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-12 h-12 " fill="currentColor" >
+                      <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
+                      <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
+                    </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">
                     {records.length === 0 ? "No passwords stored yet" : "No matching records"}
