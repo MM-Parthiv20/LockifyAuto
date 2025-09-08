@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Check, X } from "lucide-react";
+import { Shield, Eye, EyeOff, Check, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { validatePassword } from "@/lib/password-validation";
+import { AppLogo } from "@/components/app-logo";
 
 
 export default function Register() {
@@ -40,12 +41,9 @@ export default function Register() {
 
 
     try {
-      await register(formData);
-      setLocation("/");
-      toast({
-        title: "Account created",
-        description: "Welcome to Lockify Auto!",
-      });
+      await register({ username: formData.username.trim(), password: formData.password });
+      setLocation("/login");
+      toast({ title: "Account created", description: "You can now sign in." });
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -68,19 +66,21 @@ export default function Register() {
         <Button
           variant="ghost"
           size="sm"
+          className="p-2"
           onClick={() => setTheme(theme === "light" ? "dark" : "light")}
           data-testid="button-theme-toggle"
         >
-          {theme === "light" ? "🌙" : "☀️"}
+           {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </Button>
       </div>
       
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 text-center">
+        <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center">
-            <div className="bg-primary rounded-lg p-3">
-              <Shield className="w-8 h-8 text-primary-foreground" />
-            </div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-10 h-10" fill="currentColor">
+              <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
+              <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
+          </svg>
           </div>
           <div>
             <CardTitle className="text-2xl font-bold">Lockify Auto</CardTitle>
