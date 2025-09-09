@@ -12,7 +12,7 @@ interface OnboardingGuideProps {
 
 const onboardingSteps = [
   {
-    title: "Welcome to Lockify Auto",
+    title: "Welcome to Lumora",
     description: "Your secure password manager is ready to protect your digital life.",
     icon: (
       <svg
@@ -20,14 +20,14 @@ const onboardingSteps = [
         width="141"
         height="166"
         viewBox="0 0 141 166"
-        className="w-9 h-9"
+        className="w-9 h-9 text-foreground"
         fill="currentColor"
       >
         <path d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
         <path d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
       </svg>
     ),
-    content: "Lockify Auto keeps your passwords safe with military-grade encryption. All your data is protected by your master password.",
+    content: "Lumora keeps your passwords safe with military-grade encryption. All your data is protected by your master password.",
   },
   {
     title: "Add Your First Password",

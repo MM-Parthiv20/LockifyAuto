@@ -27,7 +27,7 @@ type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 
 export default function Dashboard() {
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, updateOnboardingStatus } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -83,13 +83,12 @@ export default function Dashboard() {
 
   const toggleStar = (record: PasswordRecord) => toggleStarMutation.mutate(record);
 
-  // Open onboarding once per device (localStorage flag)
+  // Open onboarding if user hasn't completed it
   useEffect(() => {
-    const seen = localStorage.getItem("lockify-onboarding-seen");
-    if (!seen) {
+    if (user && !user.hasCompletedOnboarding) {
       setIsOnboardingOpen(true);
     }
-  }, []);
+  }, [user]);
   useEffect(() => {
     if (filterOpen) setShowCalendar(false);
   }, [filterOpen]);
@@ -223,7 +222,7 @@ export default function Dashboard() {
   };
 
   const handleOnboardingComplete = async () => {
-    localStorage.setItem("lockify-onboarding-seen", "1");
+    await updateOnboardingStatus(true);
     setIsOnboardingOpen(false);
   };
 
@@ -254,7 +253,7 @@ export default function Dashboard() {
             {/* Logo and Brand */}
             <div className="flex items-center space-x-2" onClick={() => setShowProfile(false)}>
               <div className="bg-primary/10 rounded-lg text-primary">
-              <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-9 h-9" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-9 h-9 text-primary" fill="currentColor">
               <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
               <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
               </svg>
