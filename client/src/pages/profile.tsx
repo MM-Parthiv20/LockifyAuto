@@ -5,22 +5,24 @@ import { CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { PasswordRecord } from "@shared/schema";
-import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX } from "lucide-react"; // spinner icon
+import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX, Play } from "lucide-react"; // spinner icon
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import AvatarPickerDialog from "@/components/avatar-picker-dialog";
+import { OnboardingGuide } from "@/components/onboarding-guide";
 
 type ProfileProps = { onBack?: () => void };
 
 export default function Profile({ onBack }: ProfileProps) {
   const [, setLocation] = useLocation();
-  const { user, logout, updateProfileImage } = useAuth();
+  const { user, logout, updateProfileImage, updateOnboardingStatus } = useAuth();
   const { data: records = [] } = useQuery<PasswordRecord[]>({ queryKey: ["/api/records"] });
   const { toast } = useToast();
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   const stats = useMemo(() => ({
     total: records.length,
@@ -80,7 +82,7 @@ export default function Profile({ onBack }: ProfileProps) {
                 ) : (
                     <div className="bg-red-500 bg-opacity-20 rounded-md p-1 px-2 flex items-center gap-1">
                     <CircleX className="w-4 h-4 text-red-500" />
-                    <span className="text-red-500">Pending</span>
+                    <span className="text-red-500">Incomplete</span>
                     </div>
                 )}
                 </div>
@@ -90,6 +92,20 @@ export default function Profile({ onBack }: ProfileProps) {
               <div className="text-muted-foreground">Total records</div>
               <div className="font-medium">{stats.total}</div>
             </div>
+
+            {/* Complete Onboarding Button - only show if incomplete */}
+            {!user.hasCompletedOnboarding && (
+              <div className="mt-4">
+                <Button 
+                  onClick={() => setIsOnboardingOpen(true)} 
+                  className="w-full" 
+                  data-testid="button-complete-onboarding"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Complete Onboarding
+                </Button>
+              </div>
+            )}
 
                {/* Delete All Records */}
                <div className="mt-4">
@@ -196,6 +212,15 @@ export default function Profile({ onBack }: ProfileProps) {
           } catch (e: any) {
             toast({ title: "Failed to update avatar", description: e?.message || "", variant: "destructive" });
           }
+        }}
+      />
+      
+      <OnboardingGuide
+        isOpen={isOnboardingOpen}
+        onComplete={async () => {
+          setIsOnboardingOpen(false);
+          await updateOnboardingStatus(true);
+          toast({ title: "Onboarding completed!" });
         }}
       />
     </div>

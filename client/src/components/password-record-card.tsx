@@ -53,7 +53,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
           data-testid={`button-star-mobile-${record.id}`}
           title={record.starred ? "Unstar" : "Star"}
         >
-          <Star className="w-4 h-4" fill={record.starred ? "currentColor" : "none"} />
+          <Star className={`w-4 h-4 ${record.starred ? "text-yellow-500" : ""}`} fill={record.starred ? "currentColor" : "none"} />
         </Button>
         <Button
           variant="ghost"
@@ -182,7 +182,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
               data-testid={`button-star-${record.id}`}
               title={record.starred ? "Unstar" : "Star"}
             >
-              <Star className="w-3 h-3" fill={record.starred ? "currentColor" : "none"} />
+              <Star className={`w-3 h-3 ${record.starred ? "text-yellow-500" : ""}`} fill={record.starred ? "currentColor" : "none"} />
             </Button>
             <Button
               variant="outline"

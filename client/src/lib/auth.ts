@@ -95,7 +95,7 @@ export function useAuth() {
       const profileimage = `https://avatar.iran.liara.run/public/${randomId}`;
       const res = await apiRequest('POST', '/api/users', { ...userData, profileimage });
       const created = await res.json();
-      return { id: created.id as string, username: created.username as string, profileimage: created.profileimage as string } as User;
+      return { id: created.id as string, username: created.username as string, profileimage: created.profileimage as string, hasCompletedOnboarding: false } as User;
     },
     onSuccess: (user) => setLoggedIn(user),
   });
