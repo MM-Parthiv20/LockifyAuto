@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { PasswordRecord } from "@shared/schema";
-import { Copy, Edit, Trash2, Eye, EyeOff, Info } from "lucide-react";
+import { Copy, Edit, Trash2, Eye, EyeOff, Info, Star } from "lucide-react";
 
 interface PasswordRecordCardProps {
   record: PasswordRecord;
   onEdit: (record: PasswordRecord) => void;
   onDelete: (record: PasswordRecord) => void;
+  onToggleStar?: (record: PasswordRecord) => void;
 }
 
-export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordCardProps) {
+export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: PasswordRecordCardProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
@@ -44,6 +45,16 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
     <Card className="sm:p-4 hover:shadow-md transition-shadow" data-testid={`card-record-${record.id}`}>
       {/* Mobile header actions */}
       <div className="flex border-b items-center justify-end gap-1 sm:hidden p-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="p-2 h-8 w-8 border"
+          onClick={() => onToggleStar && onToggleStar(record)}
+          data-testid={`button-star-mobile-${record.id}`}
+          title={record.starred ? "Unstar" : "Star"}
+        >
+          <Star className="w-4 h-4" fill={record.starred ? "currentColor" : "none"} />
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -163,6 +174,16 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
         {/* Action Buttons & Metadata - Single Row */}
         <div className="hidden sm:flex items-center justify-between py-2 border-t border-border">
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => onToggleStar && onToggleStar(record)}
+              data-testid={`button-star-${record.id}`}
+              title={record.starred ? "Unstar" : "Star"}
+            >
+              <Star className="w-3 h-3" fill={record.starred ? "currentColor" : "none"} />
+            </Button>
             <Button
               variant="outline"
               size="sm"
