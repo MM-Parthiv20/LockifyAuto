@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,12 +14,16 @@ import { DeleteModal } from "@/components/delete-modal";
 
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar, User, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar as CalendarIcon, User, Loader2, X } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 
 import Profile from "@/pages/profile";
 import LoadingSpinner from "@/components/loading-spinner";
 
-type SortOption = "newest" | "oldest" | "email" | "updated";
+type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 
 export default function Dashboard() {
   const { theme, setTheme } = useTheme();
@@ -33,6 +38,16 @@ export default function Dashboard() {
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [showProfile, setShowProfile] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [createdDateRange, setCreatedDateRange] = useState<DateRange | undefined>(undefined);
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  const [activeDateField, setActiveDateField] = useState<"from" | "to" | null>(null);
+  const [domainInput, setDomainInput] = useState("");
+  const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
+  const [hasDescriptionOnly, setHasDescriptionOnly] = useState<boolean>(false);
+  const [starredOnly, setStarredOnly] = useState<boolean>(false);
+  const domainInputRef = useRef<HTMLInputElement | null>(null);
+  const calendarRef = useRef<HTMLDivElement | null>(null);
   const avatarUrl = (() => {
     if (user?.profileimage) return user.profileimage;
     const seed = (user?.id || user?.username || "1").length % 100 || 1;
@@ -43,6 +58,31 @@ export default function Dashboard() {
     queryKey: ["/api/records"],
   });
 
+  const queryClientRQ = useQueryClient();
+  const toggleStarMutation = useMutation({
+    mutationFn: async (r: PasswordRecord) => {
+      await apiRequest("PUT", `/api/records/${r.id}`, { starred: !r.starred });
+      return { id: r.id, starred: !r.starred };
+    },
+    onMutate: async (r) => {
+      await queryClientRQ.cancelQueries({ queryKey: ["/api/records"] });
+      const previous = queryClientRQ.getQueryData<PasswordRecord[]>(["/api/records"]);
+      if (previous) {
+        const updated = previous.map((rec) => rec.id === r.id ? ({ ...rec, starred: !rec.starred } as any) : rec);
+        queryClientRQ.setQueryData(["/api/records"], updated as any);
+      }
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) queryClientRQ.setQueryData(["/api/records"], context.previous);
+    },
+    onSettled: () => {
+      queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+    },
+  });
+
+  const toggleStar = (record: PasswordRecord) => toggleStarMutation.mutate(record);
+
   // Open onboarding once per device (localStorage flag)
   useEffect(() => {
     const seen = localStorage.getItem("lockify-onboarding-seen");
@@ -50,12 +90,92 @@ export default function Dashboard() {
       setIsOnboardingOpen(true);
     }
   }, []);
+  useEffect(() => {
+    if (filterOpen) setShowCalendar(false);
+  }, [filterOpen]);
+
+  // Close calendar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setShowCalendar(false);
+      }
+    };
+
+    if (showCalendar) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCalendar]);
+
+  const deriveDomain = (email: string) => {
+    const parts = email.split("@");
+    return parts.length > 1 ? parts[1].toLowerCase() : "";
+  };
+
+  const commonDomains = (() => {
+    const counter = new Map<string, number>();
+    for (const r of records) {
+      const d = deriveDomain(r.email);
+      if (!d) continue;
+      counter.set(d, (counter.get(d) ?? 0) + 1);
+    }
+    const inferred = Array.from(counter.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([d]) => d);
+    const defaults = [
+      "gmail.com",
+      "yahoo.com",
+      "outlook.com",
+    ];
+    const set = new Set<string>();
+    const merged: string[] = [];
+    for (const d of [...inferred, ...defaults]) {
+      const dd = d.toLowerCase();
+      if (dd && !set.has(dd)) {
+        set.add(dd);
+        merged.push(dd);
+      }
+      if (merged.length >= 15) break;
+    }
+    return merged;
+  })();
+
+  const activeFilterCount = (() => {
+    let n = 0;
+    if (createdDateRange?.from || createdDateRange?.to) n += 1;
+    if (selectedDomains.length > 0) n += 1;
+    if (hasDescriptionOnly) n += 1;
+    if (starredOnly) n += 1;
+    return n;
+  })();
 
   const filteredAndSortedRecords = (() => {
-    let filtered = records.filter(record =>
+    let filtered = records.filter(record => {
+      const matchesQuery =
       record.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-    );
+        (record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+
+      // Date range filter (createdAt)
+      const createdTime = record.createdAt ? new Date(record.createdAt as any).getTime() : undefined;
+      const fromOk = createdDateRange?.from ? (createdTime ?? 0) >= new Date(createdDateRange.from).getTime() : true;
+      const toOk = createdDateRange?.to ? (createdTime ?? 0) <= new Date(createdDateRange.to).getTime() : true;
+
+      // Domains filter
+      const domain = deriveDomain(record.email);
+      const domainOk = selectedDomains.length === 0 || selectedDomains.includes(domain);
+
+      // Description filter
+      const descOk = !hasDescriptionOnly || (record.description && record.description.trim().length > 0);
+
+      // Starred filter
+      const starOk = !starredOnly || Boolean((record as any).starred);
+
+      return matchesQuery && fromOk && toOk && domainOk && descOk && starOk;
+    });
 
     // Sort records
     switch (sortBy) {
@@ -77,6 +197,9 @@ export default function Dashboard() {
         filtered = [...filtered].sort((a, b) => getTime(b.updatedAt) - getTime(a.updatedAt));
         break;
       }
+      case "starred":
+        filtered = [...filtered].sort((a, b) => Number(Boolean((b as any).starred)) - Number(Boolean((a as any).starred)));
+        break;
     }
 
     return filtered;
@@ -110,6 +233,7 @@ export default function Dashboard() {
       case "oldest": return "Oldest First";
       case "email": return "Email A-Z";
       case "updated": return "Recently Updated";
+      case "starred": return "Starred First";
     }
   };
 
@@ -135,7 +259,7 @@ export default function Dashboard() {
               <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
               </svg>
               </div>
-              <h1 className="text-xl font-semibold text-foreground">Lockify Auto</h1>
+              <h1 className="text-xl font-semibold text-foreground">Lumora</h1>
             </div>
             
             {/* Right Side Controls */}
@@ -200,7 +324,7 @@ export default function Dashboard() {
                 </div>
                 
                 {/* Action Buttons */}
-                <div className="mobile-button-group flex flex-col sm:flex-row gap-2">
+                <div className="mobile-button-group flex flex-row gap-2">
                   <Button 
                     onClick={() => setIsPasswordGeneratorOpen(true)}
                     variant="outline"
@@ -224,8 +348,8 @@ export default function Dashboard() {
                 </div>
               </div>
               
-              {/* Search and Sort */}
-              <div className="search-sort-container mt-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
+              {/* Search, Sort and Filters */}
+              <div className="search-sort-container mt-4 sm:mt-6 flex flex-row gap-2">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                   <Input
@@ -237,19 +361,279 @@ export default function Dashboard() {
                     data-testid="input-search"
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-                    <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sort">
-                      <ArrowUpDown className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                      <SelectValue placeholder="Sort by..." />
+                <div className="flex gap-2 items-stretch">
+                <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                    <SelectTrigger className="relative w-full" data-testid="select-sort">
+                      <ArrowUpDown className="w-4 h-4" />
+                      <span className="ml-2 !hidden sm:!inline whitespace-nowrap">
+                        <SelectValue placeholder="Sort by..." />
+                      </span>
+                      {sortBy !== "newest" && (
+                        <span className="absolute -top-1 -right-1 inline-flex h-2 w-2 rounded-full bg-primary" />)
+                      }
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="newest" data-testid="sort-newest">Newest First</SelectItem>
                       <SelectItem value="oldest" data-testid="sort-oldest">Oldest First</SelectItem>
                       <SelectItem value="email" data-testid="sort-email">Email A-Z</SelectItem>
                       <SelectItem value="updated" data-testid="sort-updated">Recently Updated</SelectItem>
+                      <SelectItem value="starred" data-testid="sort-starred">Starred First</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="relative" data-testid="button-filters">
+                        <Filter className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="ml-2 hidden sm:inline">Filters</span>
+                        {activeFilterCount > 0 && (
+                          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] h-4 min-w-4 px-1">
+                            {activeFilterCount}
+                          </span>
+                        )}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[540px] px-2 py-4 sm:px-6 sm:py-6" onOpenAutoFocus={(e) => e.preventDefault()}>
+                      <DialogHeader>
+                        <DialogTitle>Filters</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        {/* Date range */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-foreground">
+                            <span>Created date range</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 mb-2 relative">
+                            <Input
+                              type="input"
+                              value={
+                                createdDateRange?.from
+                                  ? new Date(createdDateRange.from)
+                                      .toLocaleDateString("en-GB") // gives dd/mm/yyyy
+                                      .replace(/\//g, "-")         // convert / to -
+                                  : ""
+                              }                              
+                               placeholder="dd-mm-yyyy"
+                              onChange={(e) => {
+                                const d = e.target.value ? new Date(e.target.value) : undefined;
+                                setCreatedDateRange(prev => ({ from: d, to: prev?.to } as DateRange));
+                                setShowCalendar(true);
+                              }}
+                              onClick={() => { setShowCalendar(true); setActiveDateField("from"); }}
+                              data-testid="input-date-from"
+                            />
+                            <Input
+                              type="input"
+                              value={
+                                createdDateRange?.to
+                                  ? new Date(createdDateRange.to)
+                                      .toLocaleDateString("en-GB") // gives dd/mm/yyyy
+                                      .replace(/\//g, "-")         // convert / to -
+                                  : ""
+                              }
+                              
+                               placeholder="dd-mm-yyyy"
+                              onChange={(e) => {
+                                const d = e.target.value ? new Date(e.target.value) : undefined;
+                                setCreatedDateRange(prev => ({ from: prev?.from, to: d } as DateRange));
+                                setShowCalendar(true);
+                              }}
+                              onClick={() => { setShowCalendar(true); setActiveDateField("to"); }}
+                              data-testid="input-date-to"
+                            />
+                            {showCalendar && (
+                            <div 
+                              ref={calendarRef}
+                              className="rounded-md border absolute top-[calc(100%+5px)] right-0 sm:right-auto left-0 sm:left-auto bg-background calender--wrapper z-50"
+                            >
+                              <Calendar
+                                mode="range"
+                                selected={createdDateRange}
+                                onSelect={(range) => {
+                                  setCreatedDateRange(range);
+                                  if (range?.from && range?.to) {
+                                    setShowCalendar(false);
+                                  }
+                                }}
+                                numberOfMonths={1}
+                                defaultMonth={createdDateRange?.from}
+                              />
+                            </div>
+                          )}
+                          </div>
+                          {/* Presets */}
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            <Button
+                              type="button"
+                              variant="select"
+                              className="h-8 px-2 text-xs rounded"
+                              onClick={() => {
+                                const today = new Date();
+                                const from = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                const to = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                setCreatedDateRange({ from, to });
+                                setShowCalendar(false);
+                              }}
+                            >
+                              Today
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="select"
+                              className="h-8 px-2 text-xs rounded"
+                              onClick={() => {
+                                const today = new Date();
+                                const to = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                const from = new Date(to);
+                                from.setDate(from.getDate() - 6);
+                                setCreatedDateRange({ from, to });
+                                setShowCalendar(false);
+                              }}
+                            >
+                              Last 7 days
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="select"
+                              className="h-8 px-2 text-xs rounded"
+                              onClick={() => {
+                                const today = new Date();
+                                const to = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                const from = new Date(to);
+                                from.setDate(from.getDate() - 29);
+                                setCreatedDateRange({ from, to });
+                                setShowCalendar(false);
+                              }}
+                            >
+                              Last 30 days
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="select"
+                              className="h-8 px-2 text-xs rounded"
+                              onClick={() => {
+                                const from = new Date(1970, 0, 1);
+                                const to = new Date();
+                                setCreatedDateRange({ from, to });
+                                setShowCalendar(false);
+                              }}
+                            >
+                              All time
+                            </Button>
+                          </div>
+
+                        </div>
+
+                        {/* Email domains */}
+                        <div>
+                          <div className="text-sm font-medium text-foreground mb-2">Email domain</div>
+                          <div className="flex gap-2 mb-2">
+                            <Input
+                              placeholder="Add domain (e.g., gmail.com)"
+                              value={`${selectedDomains.join(", ")}${domainInput ? (selectedDomains.length ? ", " : "") + domainInput : ""}`}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const tokens = raw.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+                                if (tokens.length > 0) {
+                                  const last = raw.endsWith(",") ? "" : tokens[tokens.length - 1];
+                                  const finished = raw.endsWith(",") ? tokens : tokens.slice(0, -1);
+                                  if (finished.length > 0) {
+                                    const merged = Array.from(new Set([...selectedDomains, ...finished]));
+                                    setSelectedDomains(merged);
+                                  }
+                                  setDomainInput(last);
+                                } else {
+                                  setSelectedDomains([]);
+                                  setDomainInput("");
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const v = domainInput.trim().toLowerCase();
+                                  if (v) {
+                                    const merged = Array.from(new Set([...selectedDomains, v]));
+                                    setSelectedDomains(merged);
+                                  }
+                                  setDomainInput("");
+                                }
+                              }}
+                              data-testid="input-domain"
+                              ref={domainInputRef}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {commonDomains.map((d) => {
+                              const active = selectedDomains.includes(d);
+                              return (
+                                <button
+                                  type="button"
+                                  key={d}
+                                  className={`px-2 py-1 rounded border text-xs ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-foreground"}`}
+                                  onClick={() => {
+                                    setSelectedDomains(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+                                  }}
+                                  data-testid={`suggest-domain-${d}`}
+                                >
+                                  {d}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {selectedDomains.length > 0 && (
+                            <div className="flex flex-wrap gap-2 hidden">
+                              {selectedDomains.map((d) => (
+                                <span key={d} className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs">
+                                  {d}
+                                  <button type="button" onClick={() => setSelectedDomains(selectedDomains.filter(x => x !== d))} aria-label={`remove ${d}`}>
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Has description */}
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="has-description"
+                            checked={hasDescriptionOnly}
+                            onCheckedChange={(v) => setHasDescriptionOnly(Boolean(v))}
+                            data-testid="checkbox-has-description"
+                          />
+                          <label htmlFor="has-description" className="text-sm">Has description</label>
+                        </div>
+
+                        {/* Starred only */}
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="starred-only"
+                            checked={starredOnly}
+                            onCheckedChange={(v) => setStarredOnly(Boolean(v))}
+                            data-testid="checkbox-starred-only"
+                          />
+                          <label htmlFor="starred-only" className="text-sm">Starred only</label>
+                        </div>
+
+                        <DialogFooter className="pt-2">
+                          <div className="flex w-full justify-between">
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setCreatedDateRange(undefined);
+                                setSelectedDomains([]);
+                                setHasDescriptionOnly(false);
+                                setDomainInput("");
+                                setStarredOnly(false);
+                              }}
+                            >
+                              Clear all
+                            </Button>
+                            <Button onClick={() => setFilterOpen(false)}>Done</Button>
+                          </div>
+                        </DialogFooter>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
             </div>
@@ -305,6 +689,7 @@ export default function Dashboard() {
                       record={record}
                       onEdit={handleEditRecord}
                       onDelete={handleDeleteRecord}
+                      onToggleStar={toggleStar}
                     />
                   ))}
                 </>

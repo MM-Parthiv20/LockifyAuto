@@ -90,6 +90,7 @@ class MongoStorage implements IStorage {
       email: record.email,
       password: record.password,
       description: record.description || null,
+      starred: (record as any).starred ?? false,
       createdAt: now,
       updatedAt: now,
     } as unknown as PasswordRecord;
@@ -167,6 +168,7 @@ class MemStorage implements IStorage {
       email: record.email,
       password: record.password,
       description: record.description || null,
+      starred: (record as any).starred ?? false,
       createdAt: now,
       updatedAt: now,
     } as unknown as PasswordRecord;

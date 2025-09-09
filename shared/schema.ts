@@ -17,6 +17,7 @@ export const passwordRecords = pgTable("password_records", {
   email: text("email").notNull(),
   password: text("password").notNull(),
   description: text("description"),
+  starred: boolean("starred").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -38,6 +39,7 @@ export const insertPasswordRecordSchema = createInsertSchema(passwordRecords).pi
   email: true,
   password: true,
   description: true,
+  starred: true,
 }).extend({
   email: z.string().email("Invalid email format"),
   password: z.string()
@@ -47,6 +49,7 @@ export const insertPasswordRecordSchema = createInsertSchema(passwordRecords).pi
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   description: z.string().max(200, "Description cannot exceed 200 characters").optional(),
+  starred: z.boolean().optional(),
 });
 
 export const loginSchema = z.object({

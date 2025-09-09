@@ -185,3 +185,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #7a7a7a; 
 }
+
+.calender--wrapper{
+  thead,tbody{
+    tr{
+      justify-content: center;
+    }
+  }
+}
