@@ -14,7 +14,8 @@ import { DeleteModal } from "@/components/delete-modal";
 
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar as CalendarIcon, User, Loader2, X } from "lucide-react";
+import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar as CalendarIcon, User, Loader2, X, RefreshCcw, Trash2, MoreVertical, ArrowLeft } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,12 +23,16 @@ import { DateRange } from "react-day-picker";
 
 import Profile from "@/pages/profile";
 import LoadingSpinner from "@/components/loading-spinner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 
 export default function Dashboard() {
   const { theme, setTheme } = useTheme();
   const { user, updateOnboardingStatus } = useAuth();
+  const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -83,6 +88,58 @@ export default function Dashboard() {
   });
 
   const toggleStar = (record: PasswordRecord) => toggleStarMutation.mutate(record);
+  const isTrashView = location === "/trash";
+  const trashedRecords = (records as any[]).filter((r) => r.isDeleted);
+  const nonDeletedRecords = (records as any[]).filter((r) => !r.isDeleted);
+  const { toast } = useToast();
+
+  // Auto-delete trashed records older than 30 days when viewing Trash
+  useEffect(() => {
+    if (!isTrashView || trashedRecords.length === 0) return;
+    const now = Date.now();
+    const cutoffMs = 30 * 24 * 60 * 60 * 1000;
+    (async () => {
+      let deletedCount = 0;
+      for (const r of trashedRecords as any[]) {
+        const deletedAtMs = r.deletedAt ? new Date(r.deletedAt as any).getTime() : undefined;
+        if (deletedAtMs !== undefined && now - deletedAtMs >= cutoffMs) {
+          try {
+            await apiRequest("DELETE", `/api/records/${r.id}`);
+            deletedCount += 1;
+          } catch {}
+        }
+      }
+      if (deletedCount > 0) {
+        queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+        toast({ title: "Auto-removed old items", description: `${deletedCount} item(s) older than 30 days were deleted.` });
+      }
+    })();
+  }, [isTrashView, trashedRecords]);
+
+  const getDaysLeft = (deletedAt?: any): number | null => {
+    if (!deletedAt) return null;
+    const deletedMs = new Date(deletedAt as any).getTime();
+    if (Number.isNaN(deletedMs)) return null;
+    const now = Date.now();
+    const total = 30 * 24 * 60 * 60 * 1000;
+    const elapsed = now - deletedMs;
+    const remainingMs = total - elapsed;
+    return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  };
+
+  // Ensure profile overlay closes when navigating to Trash
+  useEffect(() => {
+    if (location === "/trash" && showProfile) {
+      setShowProfile(false);
+    }
+  }, [location]);
+
+  // Listen for a global close-profile event (emitted from Profile Trash button)
+  useEffect(() => {
+    const close = () => setShowProfile(false);
+    window.addEventListener('lockify-close-profile' as any, close as any);
+    return () => window.removeEventListener('lockify-close-profile' as any, close as any);
+  }, []);
 
   // Open onboarding if user hasn't completed it
   useEffect(() => {
@@ -155,6 +212,7 @@ export default function Dashboard() {
 
   const filteredAndSortedRecords = (() => {
     let filtered = records.filter(record => {
+      if ((record as any).isDeleted) return false;
       const matchesQuery =
       record.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
@@ -276,6 +334,8 @@ export default function Dashboard() {
                 {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
               </Button>
 
+              {/* Trash actions moved to content header */}
+
               {/* User avatar and username */}
               {user && (
                 <div className="flex items-center gap-2 pr-1 cursor-pointer" onClick={() => setShowProfile(!showProfile)}>
@@ -308,6 +368,8 @@ export default function Dashboard() {
           </div>
         </div>
       </nav>
+      {/* Trash actions dropdown component */}
+      {false && <></>}
   
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
@@ -317,39 +379,100 @@ export default function Dashboard() {
           <div>
             <div className="mb-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Your Passwords</h2>
-                  <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                    Manage your email and password records securely
-                  </p>
+                <div className="flex items-center gap-2 w-full">
+                  {isTrashView && (
+                    <ArrowLeft
+                      className="w-8 h-8 rounded-md bg-primary/10 p-1 cursor-pointer"
+                      onClick={() => {
+                        // If coming from /trash, go back to main dashboard
+                        window.location.href = "/";
+                      }}
+                      data-testid="button-back-from-trash"
+                    />
+                  )}
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+                      {isTrashView ? "Trash" : "Your Passwords"}
+                    </h2>
+                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+                      {isTrashView ? "" : "Manage your email and password records securely"}
+                    </p>
+                 
+                  </div>
+                  {isTrashView && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="p-2 ms-auto" aria-label="More actions">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled={trashedRecords.length === 0} onClick={async () => {
+                          const count = trashedRecords.length;
+                          try {
+                            for (const r of trashedRecords) {
+                              await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
+                            }
+                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                            toast({ title: "Restored items", description: `${count} item(s) restored from Trash.` });
+                          } catch (e: any) {
+                            toast({ title: "Restore failed", description: e?.message || "Could not restore all items.", variant: "destructive" });
+                          }
+                        }} data-testid="menu-restore-all">
+                          <RefreshCcw className="w-4 h-4 mr-2" /> Restore All
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled={trashedRecords.length === 0} onClick={async () => {
+                          const count = trashedRecords.length;
+                          try {
+                            for (const r of trashedRecords) {
+                              await apiRequest("DELETE", `/api/records/${r.id}`);
+                            }
+                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                            toast({ title: "Trash emptied", description: `${count} item(s) permanently deleted.` });
+                          } catch (e: any) {
+                            toast({ title: "Empty Trash failed", description: e?.message || "Could not delete all items.", variant: "destructive" });
+                          }
+                        }} data-testid="menu-empty-trash">
+                          <Trash2 className="w-4 h-4 mr-2" /> Empty Trash
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
                 
                 {/* Action Buttons */}
+                {isTrashView ? "" : (
+                    <>
                 <div className="mobile-button-group flex flex-row gap-2">
-                  <Button 
-                    onClick={() => setIsPasswordGeneratorOpen(true)}
-                    variant="outline"
-                    className="btn flex items-center justify-center"
-                    data-testid="button-password-generator"
-                  >
-                    <Key className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="text-sm sm:text-base">
-                      <span className="hidden sm:inline">Password Generator</span>
-                      <span className="sm:hidden">Generate</span>
-                    </span>
-                  </Button>
-                  <Button 
-                    onClick={handleAddRecord}
-                    className="btn flex items-center justify-center"
-                    data-testid="button-add-record"
-                  >
-                    <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="text-sm sm:text-base">Add Record</span>
-                  </Button>
+              
+                      <Button 
+                        onClick={() => setIsPasswordGeneratorOpen(true)}
+                        variant="outline"
+                        className="btn flex items-center justify-center"
+                        data-testid="button-password-generator"
+                      >
+                        <Key className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="text-sm sm:text-base">
+                          <span className="hidden sm:inline">Password Generator</span>
+                          <span className="sm:hidden">Generate</span>
+                        </span>
+                      </Button>
+                      <Button 
+                        onClick={handleAddRecord}
+                        className="btn flex items-center justify-center"
+                        data-testid="button-add-record"
+                      >
+                        <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="text-sm sm:text-base">Add Record</span>
+                      </Button>
+                 
                 </div>
+                   </>
+                  )}
               </div>
               
               {/* Search, Sort and Filters */}
+              {!isTrashView && (
               <div className="search-sort-container mt-4 sm:mt-6 flex flex-row gap-2">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
@@ -637,63 +760,124 @@ export default function Dashboard() {
                   </Dialog>
                 </div>
               </div>
+              )}
             </div>
   
             {/* Records Grid */}
             <div className="space-y-4">
-              {filteredAndSortedRecords.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 text-muted-foreground">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-12 h-12 " fill="currentColor" >
-                      <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
-                      <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    {records.length === 0 ? "No passwords stored yet" : "No matching records"}
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    {records.length === 0 
-                      ? "Get started by adding your first email and password record"
-                      : "Try adjusting your search terms or sorting options"
-                    }
-                  </p>
-                  {records.length === 0 && (
-                    <div className="mobile-button-group flex flex-col sm:flex-row gap-2 justify-center">
-                      <Button onClick={handleAddRecord} className="btn" data-testid="button-add-first-record">
-                        Add Your First Record
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setIsPasswordGeneratorOpen(true)}
-                        className="btn"
-                        data-testid="button-try-generator"
-                      >
-                        Try Password Generator
-                      </Button>
+              {isTrashView ? (
+                trashedRecords.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground">No items in Trash</div>
+                ) : (
+                  trashedRecords.map((r) => (
+                    <div key={r.id} className="border rounded-md p-3 flex items-center justify-between">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate flex items-center gap-2">
+                          {r.email}
+                         
+                        </div>
+                        {r.description && <div className="text-sm text-muted-foreground truncate">{r.description}</div>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                      {(() => {
+                            const deletedAt = (r as any).deletedAt;
+                            if (!deletedAt) return null;
+                            const deletedMs = new Date(deletedAt as any).getTime();
+                            if (Number.isNaN(deletedMs)) return null;
+                            const now = Date.now();
+                            const total = 30 * 24 * 60 * 60 * 1000;
+                            const remainingMs = Math.max(0, total - (now - deletedMs));
+                            const daysLeft = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+                            const urgent = daysLeft <= 3;
+                            return (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${urgent ? "bg-red-500 text-white" : "bg-muted text-foreground"}`} title={`Auto-deletes in ${daysLeft} day(s)`}>
+                                {daysLeft}d left
+                              </span>
+                            );
+                          })()}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          title="Restore"
+                          aria-label="Restore"
+                          onClick={async () => {
+                            await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
+                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                          }}
+                        >
+                          <RefreshCcw className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          title="Delete forever"
+                          aria-label="Delete forever"
+                          onClick={async () => {
+                            await apiRequest("DELETE", `/api/records/${r.id}`);
+                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  ))
+                )
               ) : (
-                <>
-                  <div className="flex justify-between items-center text-sm text-muted-foreground">
-                    <span data-testid="text-records-count">
-                      {filteredAndSortedRecords.length} of {records.length} records
-                    </span>
-                    <span data-testid="text-sort-info">
-                      Sorted by {getSortLabel(sortBy)}
-                    </span>
+                filteredAndSortedRecords.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 text-muted-foreground">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-12 h-12 " fill="currentColor" >
+                        <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
+                        <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-foreground mb-2">
+                      {records.length === 0 ? "No passwords stored yet" : "No matching records"}
+                    </h3>
+                    <p className="text-muted-foreground mb-6">
+                      {records.length === 0 
+                        ? "Get started by adding your first email and password record"
+                        : "Try adjusting your search terms or sorting options"
+                      }
+                    </p>
+                    {records.length === 0 && (
+                      <div className="mobile-button-group flex flex-col sm:flex-row gap-2 justify-center">
+                        <Button onClick={handleAddRecord} className="btn" data-testid="button-add-first-record">
+                          Add Your First Record
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsPasswordGeneratorOpen(true)}
+                          className="btn"
+                          data-testid="button-try-generator"
+                        >
+                          Try Password Generator
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  {filteredAndSortedRecords.map((record) => (
-                    <PasswordRecordCard
-                      key={record.id}
-                      record={record}
-                      onEdit={handleEditRecord}
-                      onDelete={handleDeleteRecord}
-                      onToggleStar={toggleStar}
-                    />
-                  ))}
-                </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground">
+                      <span data-testid="text-records-count">
+                        {filteredAndSortedRecords.length} of {nonDeletedRecords.length} records
+                      </span>
+                      <span data-testid="text-sort-info">
+                        Sorted by {getSortLabel(sortBy)}
+                      </span>
+                    </div>
+                    {filteredAndSortedRecords.map((record) => (
+                      <PasswordRecordCard
+                        key={record.id}
+                        record={record}
+                        onEdit={handleEditRecord}
+                        onDelete={handleDeleteRecord}
+                        onToggleStar={toggleStar}
+                      />
+                    ))}
+                  </>
+                )
               )}
             </div>
           </div>

@@ -32,6 +32,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/trash" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route component={NotFound} />

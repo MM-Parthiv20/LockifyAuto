@@ -18,6 +18,9 @@ export const passwordRecords = pgTable("password_records", {
   password: text("password").notNull(),
   description: text("description"),
   starred: boolean("starred").default(false).notNull(),
+  // Soft delete fields for Trash
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -50,6 +53,8 @@ export const insertPasswordRecordSchema = createInsertSchema(passwordRecords).pi
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   description: z.string().max(200, "Description cannot exceed 200 characters").optional(),
   starred: z.boolean().optional(),
+  isDeleted: z.boolean().optional(),
+  deletedAt: z.string().datetime().optional(),
 });
 
 export const loginSchema = z.object({

@@ -19,14 +19,15 @@ export function DeleteModal({ isOpen, onClose, record }: DeleteModalProps) {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!record) throw new Error("No record to delete");
-      const res = await apiRequest("DELETE", `/api/records/${record.id}`);
+      const now = new Date().toISOString();
+      const res = await apiRequest("PUT", `/api/records/${record.id}`, { isDeleted: true, deletedAt: now });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trash"] });
       toast({
-        title: "Record deleted",
-        description: "Your password record has been deleted successfully",
+        title: "Moved to Trash",
       });
       onClose();
     },
