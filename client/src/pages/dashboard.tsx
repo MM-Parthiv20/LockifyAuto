@@ -48,6 +48,7 @@ export default function Dashboard() {
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
   const domainInputRef = useRef<HTMLInputElement | null>(null);
   const calendarRef = useRef<HTMLDivElement | null>(null);
+  const wasEmptyBeforeAddRef = useRef<boolean>(false);
   const avatarUrl = (() => {
     if (user?.profileimage) return user.profileimage;
     const seed = (user?.id || user?.username || "1").length % 100 || 1;
@@ -205,6 +206,7 @@ export default function Dashboard() {
   })();
 
   const handleAddRecord = () => {
+    wasEmptyBeforeAddRef.current = records.length === 0;
     setSelectedRecord(null);
     setModalMode("add");
     setIsRecordModalOpen(true);
@@ -704,6 +706,21 @@ export default function Dashboard() {
         onClose={() => setIsRecordModalOpen(false)}
         mode={modalMode}
         record={selectedRecord}
+        onCreateSuccess={async () => {
+          if (wasEmptyBeforeAddRef.current) {
+            try {
+              const mod = await import("canvas-confetti");
+              const confetti = mod.default;
+              confetti({
+                particleCount: 80,
+                spread: 70,
+                origin: { y: 0.6 },
+              });
+              setTimeout(() => confetti({ particleCount: 60, angle: 60, spread: 55, origin: { x: 0 } }), 150);
+              setTimeout(() => confetti({ particleCount: 60, angle: 120, spread: 55, origin: { x: 1 } }), 150);
+            } catch {}
+          }
+        }}
       />
   
       <DeleteModal
