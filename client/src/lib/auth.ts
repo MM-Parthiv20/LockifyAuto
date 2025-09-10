@@ -10,22 +10,34 @@ interface User {
 }
 
 const AUTH_KEY = 'lockify-auth';
+const SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 const DEFAULT_CREDENTIALS = { username: 'parthiv21', password: 'Parthiv2011!' };
 const AVATAR_CACHE_PREFIX = 'lockify-avatar-';
 
 export function useAuth() {
-  const [auth, setAuth] = useState<{ user: User } | null>(() => {
+  const [auth, setAuth] = useState<{ user: User; expiresAt?: number } | null>(() => {
     try {
       const raw = localStorage.getItem(AUTH_KEY);
-      return raw ? JSON.parse(raw) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed) return null;
+      // Expire old sessions
+      if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+        localStorage.removeItem(AUTH_KEY);
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
   });
   const queryClient = useQueryClient();
 
-  const setLoggedIn = (user: User) => {
-    const value = { user: { ...user, hasCompletedOnboarding: user.hasCompletedOnboarding ?? true } };
+  const setLoggedIn = (user: User, options?: { preserveExpiry?: boolean }) => {
+    const currentExpiresAt = auth?.expiresAt;
+    const expiresAt = options?.preserveExpiry && currentExpiresAt
+      ? currentExpiresAt
+      : Date.now() + SESSION_DURATION_MS;
+    const value = { user: { ...user, hasCompletedOnboarding: user.hasCompletedOnboarding ?? true }, expiresAt };
     localStorage.setItem(AUTH_KEY, JSON.stringify(value));
     setAuth(value);
     // notify other hook instances in same tab
@@ -41,7 +53,12 @@ export function useAuth() {
       try {
         const raw = localStorage.getItem(AUTH_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
-        setAuth(parsed);
+        if (parsed?.expiresAt && Date.now() > parsed.expiresAt) {
+          localStorage.removeItem(AUTH_KEY);
+          setAuth(null);
+        } else {
+          setAuth(parsed);
+        }
       } catch {}
     };
     const onStorage = (e: StorageEvent) => {
@@ -54,6 +71,21 @@ export function useAuth() {
       window.removeEventListener('lockify-auth-updated' as any, syncFromStorage as any);
     };
   }, []);
+
+  // Auto-logout timer based on expiresAt
+  React.useEffect(() => {
+    if (!auth?.expiresAt) return;
+    const remaining = auth.expiresAt - Date.now();
+    if (remaining <= 0) {
+      logout();
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      logout();
+    }, remaining);
+    return () => window.clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.expiresAt]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
@@ -114,7 +146,7 @@ export function useAuth() {
     mutationFn: async (hasCompleted: boolean) => {
       if (!auth?.user) return;
       const updated: User = { ...auth.user, hasCompletedOnboarding: hasCompleted };
-      setLoggedIn(updated);
+      setLoggedIn(updated, { preserveExpiry: true });
       return updated;
     },
   });
@@ -132,7 +164,7 @@ export function useAuth() {
         localStorage.setItem(AVATAR_CACHE_PREFIX + usernameKey, profileimage);
       } catch {}
       const updated: User = { ...auth.user, profileimage };
-      setLoggedIn(updated);
+      setLoggedIn(updated, { preserveExpiry: true });
       return updated;
     },
   });

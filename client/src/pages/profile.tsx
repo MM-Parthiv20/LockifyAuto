@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,7 @@ export default function Profile({ onBack }: ProfileProps) {
   const { data: records = [] } = useQuery<PasswordRecord[]>({ queryKey: ["/api/records"] });
   const { toast } = useToast();
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -67,6 +68,20 @@ export default function Profile({ onBack }: ProfileProps) {
           <h2 className="mt-2 mb-4 text-2xl font-semibold">{user.username}</h2>
           
           <CardContent className="p-0 w-full">
+            <div className="flex py-3 gap-2 text-sm justify-end">
+              <Link href="/trash">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  data-testid="button-profile-go-trash"
+                  onClick={() => {
+                    try { window.dispatchEvent(new CustomEvent('lockify-close-profile')); } catch {}
+                  }}
+                >
+                  Trash
+                </Button>
+              </Link>
+            </div>
             <div className="flex py-3 gap-2 text-sm justify-between border-b border-border">
               <div className="text-muted-foreground">Username</div>
               <div className="font-medium">{user.username}</div>
@@ -126,19 +141,40 @@ export default function Profile({ onBack }: ProfileProps) {
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
+                      disabled={isDeletingAll}
                       onClick={async () => {
+                        if (isDeletingAll) return;
+                        setIsDeletingAll(true);
                         try {
                           const res = await apiRequest("GET", "/api/records");
                           const list = (await res.json()) as Array<{ id: string }>;
-                          await Promise.all(list.map((r) => apiRequest("DELETE", `/api/records/${r.id}`)));
+                          let success = 0;
+                          let failed = 0;
+                          for (const r of list) {
+                            try {
+                              await apiRequest("DELETE", `/api/records/${r.id}`);
+                              success += 1;
+                            } catch {
+                              failed += 1;
+                            }
+                          }
                           await queryClient.invalidateQueries({ queryKey: ["/api/records"] });
-                          toast({ title: "All records deleted" });
+                          if (failed === 0) {
+                            toast({ title: "All records deleted" });
+                          } else if (success > 0) {
+                            toast({ title: `Deleted ${success} records`, description: `${failed} failed`, variant: "destructive" });
+                          } else {
+                            toast({ title: "Failed to delete records", description: "No records were deleted", variant: "destructive" });
+                          }
+                          setIsDeleteAllOpen(false);
                         } catch (e: any) {
                           toast({ title: "Failed to delete records", description: e?.message || "", variant: "destructive" });
+                        } finally {
+                          setIsDeletingAll(false);
                         }
                       }}
                     >
-                      Delete
+                      {isDeletingAll ? "Deleting..." : "Delete"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
