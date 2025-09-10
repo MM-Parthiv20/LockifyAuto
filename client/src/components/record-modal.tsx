@@ -17,9 +17,10 @@ interface RecordModalProps {
   onClose: () => void;
   mode: "add" | "edit";
   record?: PasswordRecord | null;
+  onCreateSuccess?: () => void;
 }
 
-export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps) {
+export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: RecordModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -69,6 +70,11 @@ export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps)
         title: "Record created",
         description: "Your password record has been saved successfully",
       });
+      if (onCreateSuccess) {
+        try {
+          onCreateSuccess();
+        } catch {}
+      }
       onClose();
     },
     onError: (error: any) => {
