@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PasswordRecord } from "@shared/schema";
 import { AlertTriangle } from "lucide-react";
+import { history } from "@/lib/history";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -29,6 +30,9 @@ export function DeleteModal({ isOpen, onClose, record }: DeleteModalProps) {
       toast({
         title: "Moved to Trash",
       });
+      try {
+        history.add({ type: "record:delete", summary: `Moved to Trash: ${record?.email}`, details: { id: record?.id } });
+      } catch {}
       onClose();
     },
     onError: (error: any) => {

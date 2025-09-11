@@ -26,6 +26,7 @@ import LoadingSpinner from "@/components/loading-spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { history } from "@/lib/history";
 
 type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 
@@ -84,6 +85,10 @@ export default function Dashboard() {
     },
     onSettled: () => {
       queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+      try {
+        // We cannot know final value here precisely, but summarize the toggle action
+        history.add({ type: "record:toggleStar", summary: "Toggled star on a record" });
+      } catch {}
     },
   });
 
@@ -112,6 +117,9 @@ export default function Dashboard() {
       if (deletedCount > 0) {
         queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
         toast({ title: "Auto-removed old items", description: `${deletedCount} item(s) older than 30 days were deleted.` });
+        try {
+          history.add({ type: "trash:autoDelete", summary: `Auto-deleted ${deletedCount} item(s) from Trash` });
+        } catch {}
       }
     })();
   }, [isTrashView, trashedRecords]);
@@ -363,6 +371,9 @@ export default function Dashboard() {
                 <span className="hidden sm:inline">Profile</span>
               </Button>
   
+              {/* History Panel */}
+              <HistoryPanelButton />
+
               {/* User Menu removed for open app */}
             </div>
           </div>
@@ -415,6 +426,9 @@ export default function Dashboard() {
                             }
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
                             toast({ title: "Restored items", description: `${count} item(s) restored from Trash.` });
+                            try {
+                              history.add({ type: "record:restore", summary: `Restored ${count} item(s) from Trash` });
+                            } catch {}
                           } catch (e: any) {
                             toast({ title: "Restore failed", description: e?.message || "Could not restore all items.", variant: "destructive" });
                           }
@@ -429,6 +443,9 @@ export default function Dashboard() {
                             }
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
                             toast({ title: "Trash emptied", description: `${count} item(s) permanently deleted.` });
+                            try {
+                              history.add({ type: "trash:empty", summary: `Emptied Trash: ${count} item(s)` });
+                            } catch {}
                           } catch (e: any) {
                             toast({ title: "Empty Trash failed", description: e?.message || "Could not delete all items.", variant: "destructive" });
                           }
@@ -803,6 +820,9 @@ export default function Dashboard() {
                           onClick={async () => {
                             await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                            try {
+                              history.add({ type: "record:restore", summary: `Restored: ${r.email}`, details: { id: r.id } });
+                            } catch {}
                           }}
                         >
                           <RefreshCcw className="w-4 h-4" />
@@ -815,6 +835,9 @@ export default function Dashboard() {
                           onClick={async () => {
                             await apiRequest("DELETE", `/api/records/${r.id}`);
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                            try {
+                              history.add({ type: "record:delete", summary: `Permanently deleted: ${r.email}`, details: { id: r.id } });
+                            } catch {}
                           }}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -923,5 +946,59 @@ export default function Dashboard() {
         onClose={() => setIsPasswordGeneratorOpen(false)}
       />
     </div>
+  );
+}
+
+function HistoryPanelButton() {
+  const [open, setOpen] = useState(false);
+  const [events, setEvents] = useState(() => history.list());
+
+  useEffect(() => {
+    const refresh = () => setEvents(history.list());
+    window.addEventListener('lockify-history-updated' as any, refresh as any);
+    return () => window.removeEventListener('lockify-history-updated' as any, refresh as any);
+  }, []);
+
+  const formatTime = (ts: number) => new Date(ts).toLocaleString();
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="p-2" title="History">
+          <span className="text-sm">History</span>
+          {events.length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] h-4 min-w-4 px-1">
+              {Math.min(99, events.length)}
+            </span>
+          )}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Activity History</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">
+          {events.length === 0 ? (
+            <div className="text-center text-muted-foreground py-6">No activity yet</div>
+          ) : (
+            events.map((e) => (
+              <div key={e.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-sm break-words">{e.summary}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{formatTime(e.timestamp)}</div>
+                </div>
+                <Badge variant="secondary" className="shrink-0 text-[10px] uppercase">{e.type}</Badge>
+              </div>
+            ))
+          )}
+        </div>
+        <DialogFooter>
+          <div className="flex w-full justify-between">
+            <Button variant="outline" onClick={() => setEvents(history.list())}>Refresh</Button>
+            <Button variant="destructive" onClick={() => { history.clear(); setEvents([]); }}>Clear All</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
