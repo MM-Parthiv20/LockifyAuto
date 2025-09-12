@@ -69,6 +69,18 @@ export default function Profile({ onBack }: ProfileProps) {
           
           <CardContent className="p-0 w-full">
             <div className="flex py-3 gap-2 text-sm justify-end">
+              <Link href="/history">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  data-testid="button-profile-go-history"
+                  onClick={() => {
+                    try { window.dispatchEvent(new CustomEvent('lockify-close-profile')); } catch {}
+                  }}
+                >
+                  History
+                </Button>
+              </Link>
               <Link href="/trash">
                 <Button 
                   variant="outline" 

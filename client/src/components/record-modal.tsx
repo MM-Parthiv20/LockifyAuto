@@ -11,6 +11,7 @@ import { PasswordRecord, insertPasswordRecordSchema } from "@shared/schema";
 import { validatePassword } from "@/lib/password-validation";
 import { PasswordGenerator } from "@/components/password-generator";
 import { Eye, EyeOff, Check, X, Key } from "lucide-react";
+import { history } from "@/lib/history";
 
 interface RecordModalProps {
   isOpen: boolean;
@@ -70,6 +71,9 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
         title: "Record created",
         description: "Your password record has been saved successfully",
       });
+      try {
+        history.add({ type: "record:create", summary: `Created record for ${formData.email}`, details: { email: formData.email } });
+      } catch {}
       if (onCreateSuccess) {
         try {
           onCreateSuccess();
@@ -101,6 +105,9 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
         title: "Record updated",
         description: "Your password record has been updated successfully",
       });
+      try {
+        history.add({ type: "record:update", summary: `Updated record ${record?.email || formData.email}`, details: { id: record?.id } });
+      } catch {}
       onClose();
     },
     onError: (error: any) => {

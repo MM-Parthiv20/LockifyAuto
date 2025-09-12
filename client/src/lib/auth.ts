@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from './queryClient';
+import { history } from './history';
 
 interface User {
   id: string;
@@ -110,7 +111,12 @@ export function useAuth() {
       if (!match) throw new Error('Invalid credentials');
       return { id: match.id, username: match.username, profileimage: match.profileimage, hasCompletedOnboarding: true } as User;
     },
-    onSuccess: (user) => setLoggedIn(user),
+    onSuccess: (user) => {
+      setLoggedIn(user);
+      try {
+        history.add({ type: 'login', summary: `Logged in as ${user.username}` });
+      } catch {}
+    },
   });
 
   const registerMutation = useMutation({
@@ -129,7 +135,12 @@ export function useAuth() {
       const created = await res.json();
       return { id: created.id as string, username: created.username as string, profileimage: created.profileimage as string, hasCompletedOnboarding: false } as User;
     },
-    onSuccess: (user) => setLoggedIn(user),
+    onSuccess: (user) => {
+      setLoggedIn(user);
+      try {
+        history.add({ type: 'register', summary: `Registered new user ${user.username}` });
+      } catch {}
+    },
   });
 
   const logout = () => {
@@ -139,6 +150,9 @@ export function useAuth() {
     // No hard reload to avoid 404 in static deployments; ProtectedRoute will render Login
     try {
       window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
+    } catch {}
+    try {
+      history.add({ type: 'logout', summary: 'Logged out' });
     } catch {}
   };
 
