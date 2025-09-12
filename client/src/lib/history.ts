@@ -21,6 +21,21 @@ export interface HistoryEvent {
 const STORAGE_KEY = "lockify-history";
 const MAX_EVENTS = 300;
 
+// Remote persistence (MockAPI)
+const HISTORY_API_URL = "https://677537fa92222241481aee8e.mockapi.io/history";
+
+function getCurrentUserId(): string | null {
+  try {
+    const raw = localStorage.getItem('lockify-auth');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const id = parsed?.user?.id || parsed?.user?.username || null;
+    return typeof id === 'string' && id ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 function readAll(): HistoryEvent[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -55,6 +70,24 @@ export const history = {
     const all = readAll();
     all.push(newEvent);
     writeAll(all);
+    // Fire-and-forget remote persist
+    try {
+      const userId = getCurrentUserId();
+      if (userId) {
+        fetch(HISTORY_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: newEvent.id,
+            userId,
+            type: newEvent.type,
+            timestamp: newEvent.timestamp,
+            summary: newEvent.summary,
+            details: newEvent.details ? JSON.stringify(newEvent.details) : "",
+          }),
+        }).catch(() => {});
+      }
+    } catch {}
     try {
       window.dispatchEvent(new CustomEvent("lockify-history-updated"));
     } catch {}
@@ -62,11 +95,52 @@ export const history = {
   },
 
   list(): HistoryEvent[] {
+    // Kick off background sync from API (non-blocking)
+    try {
+      const userId = getCurrentUserId();
+      if (userId) {
+        const url = `${HISTORY_API_URL}?userId=${encodeURIComponent(userId)}`;
+        fetch(url, { method: 'GET' })
+          .then((res) => res.ok ? res.json() : Promise.reject())
+          .then((rows: Array<{ id: string; userId: string; type: string; timestamp: number; summary: string; details?: string }>) => {
+            if (!Array.isArray(rows)) return;
+            const fromApi: HistoryEvent[] = rows.map((r) => ({
+              id: r.id,
+              type: r.type as HistoryEventType,
+              timestamp: Number(r.timestamp) || Date.now(),
+              summary: r.summary,
+              details: (() => {
+                if (!r.details) return undefined;
+                try { return JSON.parse(r.details); } catch { return { raw: r.details }; }
+              })(),
+            }));
+            writeAll(fromApi);
+            try { window.dispatchEvent(new CustomEvent('lockify-history-updated')); } catch {}
+          })
+          .catch(() => {});
+      }
+    } catch {}
     return readAll().sort((a, b) => b.timestamp - a.timestamp);
   },
 
   clear(): void {
     writeAll([]);
+    // Remote delete for current user
+    try {
+      const userId = getCurrentUserId();
+      if (userId) {
+        const url = `${HISTORY_API_URL}?userId=${encodeURIComponent(userId)}`;
+        fetch(url)
+          .then((res) => res.ok ? res.json() : Promise.reject())
+          .then((rows: Array<{ id: string }>) => {
+            const ids = Array.isArray(rows) ? rows.map((r) => r.id) : [];
+            ids.forEach((id) => {
+              fetch(`${HISTORY_API_URL}/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+            });
+          })
+          .catch(() => {});
+      }
+    } catch {}
     try {
       window.dispatchEvent(new CustomEvent("lockify-history-updated"));
     } catch {}

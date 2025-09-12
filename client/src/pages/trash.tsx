@@ -56,8 +56,8 @@ export default function Trash() {
                 queryClient.invalidateQueries({ queryKey: ["/api/records"] });
               }}
             >
-              <RefreshCcw className="w-4 h-4" />
-              <span className="ml-2">Restore All</span>
+              <RefreshCcw className="w-4 h-4 sm:hidden" />
+              <span className="ml-2 hidden sm:inline">Restore All</span>
             </Button>
             <Button
               variant="destructive"
@@ -69,8 +69,8 @@ export default function Trash() {
                 queryClient.invalidateQueries({ queryKey: ["/api/records"] });
               }}
             >
-              <Trash2 className="w-4 h-4" />
-              <span className="ml-2">Empty Trash</span>
+              <Trash2 className="w-4 h-4 sm:hidden" />
+              <span className="ml-2 hidden sm:inline">Empty Trash</span>
             </Button>
           </div>
         </div>
@@ -91,21 +91,23 @@ export default function Trash() {
                     {r.description && <div className="text-sm text-muted-foreground truncate">{r.description}</div>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
+                    <Button className="p-2"
                       variant="outline"
                       size="sm"
                       onClick={() => restoreMutation.mutate(r.id)}
                       disabled={restoreMutation.isPending}
                     >
-                      Restore
+                      <RefreshCcw className="w-4 h-4 sm:hidden" />
+                      <span className="hidden sm:inline">Restore</span>
                     </Button>
-                    <Button
+                    <Button className="p-2"
                       variant="destructive"
                       size="sm"
                       onClick={() => deleteForeverMutation.mutate(r.id)}
                       disabled={deleteForeverMutation.isPending}
                     >
-                      Delete Forever
+                      <Trash2 className="w-4 h-4 sm:hidden" />
+                      <span className="hidden sm:inline">Delete Forever</span>
                     </Button>
                   </div>
                 </div>

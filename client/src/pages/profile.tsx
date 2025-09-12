@@ -71,26 +71,38 @@ export default function Profile({ onBack }: ProfileProps) {
             <div className="flex py-3 gap-2 text-sm justify-end">
               <Link href="/history">
                 <Button 
-                  variant="outline" 
-                  size="sm" 
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 p-2"
                   data-testid="button-profile-go-history"
-                  onClick={() => {
-                    try { window.dispatchEvent(new CustomEvent('lockify-close-profile')); } catch {}
-                  }}
+                  onClick={() => { try { window.dispatchEvent(new CustomEvent('lockify-close-profile')); } catch {} }}
+                  title="View your activity history"
                 >
-                  History
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <path d="M3 3v5h5" />
+                    <path d="M3.05 13A9 9 0 1 0 7 4.6L3 8" />
+                    <path d="M12 7v5l4 2" />
+                  </svg>
+                  <span className="hidden sm:inline">History</span>
                 </Button>
               </Link>
               <Link href="/trash">
                 <Button 
-                  variant="outline" 
-                  size="sm" 
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 p-2"
                   data-testid="button-profile-go-trash"
-                  onClick={() => {
-                    try { window.dispatchEvent(new CustomEvent('lockify-close-profile')); } catch {}
-                  }}
+                  onClick={() => { try { window.dispatchEvent(new CustomEvent('lockify-close-profile')); } catch {} }}
+                  title="Open Trash"
                 >
-                  Trash
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                  <span className="hidden sm:inline">Trash</span>
                 </Button>
               </Link>
             </div>

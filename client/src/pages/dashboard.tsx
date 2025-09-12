@@ -14,7 +14,7 @@ import { DeleteModal } from "@/components/delete-modal";
 
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar as CalendarIcon, User, Loader2, X, RefreshCcw, Trash2, MoreVertical, ArrowLeft } from "lucide-react";
+import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar as CalendarIcon, User, Loader2, X, RefreshCcw, Trash2, MoreVertical, ArrowLeft, RefreshCw } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -799,7 +799,7 @@ export default function Dashboard() {
             <div className="space-y-4">
               {isHistoryView ? (
                 <>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                  <div className="flex flex-row gap-2 sm:items-center sm:justify-between">
                     <div className="flex-1">
                       <Input
                         type="text"
@@ -811,8 +811,15 @@ export default function Dashboard() {
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => setHistoryEvents(history.list())}>Refresh</Button>
-                      <Button variant="destructive" disabled={historyEvents.length === 0} onClick={() => history.clear()}>Clear All</Button>
+                      
+                      <Button variant="outline" size="icon" onClick={() => setHistoryEvents(history.list())} className="sm:hidden" title="Refresh">
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" onClick={() => setHistoryEvents(history.list())} className="hidden sm:inline-flex">Refresh</Button>
+                      <Button variant="destructive" size="icon" disabled={historyEvents.length === 0} onClick={() => { history.clear(); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="sm:hidden" title="Clear All">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="destructive" disabled={historyEvents.length === 0} onClick={() => { history.clear(); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="hidden sm:inline-flex">Clear All</Button>
                     </div>
                   </div>
                   {filteredHistory.length === 0 ? (
