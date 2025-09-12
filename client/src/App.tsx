@@ -1,6 +1,5 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import Dashboard from "@/pages/dashboard";
-import Trash from "@/pages/trash";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import NotFound from "@/pages/not-found";
@@ -14,7 +13,7 @@ export default function App() {
       <ThemeProvider>
         <Switch>
           <Route path="/" component={Dashboard} />
-          <Route path="/trash" component={Trash} />
+          <Route path="/trash" component={Dashboard} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/history" component={Dashboard} />

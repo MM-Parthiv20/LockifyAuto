@@ -18,18 +18,40 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
   const { toast } = useToast();
 
   const copyToClipboard = async (text: string, fieldName: string) => {
+    // Try modern API first
     try {
-      await navigator.clipboard.writeText(text);
-      toast({
-        title: "Copied to clipboard",
-        description: `${fieldName} has been copied to your clipboard`,
-      });
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for http/non-secure contexts or older browsers
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      toast({ title: "Copied to clipboard", description: `${fieldName} has been copied to your clipboard` });
     } catch (error) {
-      toast({
-        title: "Copy failed",
-        description: "Failed to copy to clipboard",
-        variant: "destructive",
-      });
+      try {
+        // Last-resort fallback using selection API
+        const range = document.createRange();
+        const node = document.createTextNode(text);
+        document.body.appendChild(node);
+        range.selectNode(node);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        document.execCommand("copy");
+        selection?.removeAllRanges();
+        document.body.removeChild(node);
+        toast({ title: "Copied to clipboard", description: `${fieldName} has been copied to your clipboard` });
+      } catch {
+        toast({ title: "Copy failed", description: "Failed to copy to clipboard", variant: "destructive" });
+      }
     }
   };
 
