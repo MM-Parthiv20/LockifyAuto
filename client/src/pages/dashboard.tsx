@@ -94,9 +94,25 @@ export default function Dashboard() {
 
   const toggleStar = (record: PasswordRecord) => toggleStarMutation.mutate(record);
   const isTrashView = location === "/trash";
+  const isHistoryView = location === "/history";
   const trashedRecords = (records as any[]).filter((r) => r.isDeleted);
   const nonDeletedRecords = (records as any[]).filter((r) => !r.isDeleted);
   const { toast } = useToast();
+
+  // History page state (for /history)
+  const [historyEvents, setHistoryEvents] = useState(() => history.list());
+  const [historyFilter, setHistoryFilter] = useState("");
+  useEffect(() => {
+    const refresh = () => setHistoryEvents(history.list());
+    window.addEventListener('lockify-history-updated' as any, refresh as any);
+    return () => window.removeEventListener('lockify-history-updated' as any, refresh as any);
+  }, []);
+  const filteredHistory = (() => {
+    const q = historyFilter.trim().toLowerCase();
+    if (!q) return historyEvents;
+    return historyEvents.filter(e => e.summary.toLowerCase().includes(q) || e.type.toLowerCase().includes(q));
+  })();
+  const formatHistoryTime = (ts: number) => new Date(ts).toLocaleString();
 
   // Auto-delete trashed records older than 30 days when viewing Trash
   useEffect(() => {
@@ -371,8 +387,7 @@ export default function Dashboard() {
                 <span className="hidden sm:inline">Profile</span>
               </Button>
   
-              {/* History Panel */}
-              <HistoryPanelButton />
+              {/* History moved to Profile page */}
 
               {/* User Menu removed for open app */}
             </div>
@@ -391,7 +406,7 @@ export default function Dashboard() {
             <div className="mb-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-2 w-full">
-                  {isTrashView && (
+                  {(isTrashView || isHistoryView) && (
                     <ArrowLeft
                       className="w-8 h-8 rounded-md bg-primary/10 p-1 cursor-pointer"
                       onClick={() => {
@@ -403,10 +418,10 @@ export default function Dashboard() {
                   )}
                   <div>
                     <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-                      {isTrashView ? "Trash" : "Your Passwords"}
+                      {isTrashView ? "Trash" : isHistoryView ? "Activity History" : "Your Passwords"}
                     </h2>
                     <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                      {isTrashView ? "" : "Manage your email and password records securely"}
+                      {isTrashView || isHistoryView ? "" : "Manage your email and password records securely"}
                     </p>
                  
                   </div>
@@ -458,7 +473,7 @@ export default function Dashboard() {
                 </div>
                 
                 {/* Action Buttons */}
-                {isTrashView ? "" : (
+                {isTrashView || isHistoryView ? "" : (
                     <>
                 <div className="mobile-button-group flex flex-row gap-2">
               
@@ -489,7 +504,7 @@ export default function Dashboard() {
               </div>
               
               {/* Search, Sort and Filters */}
-              {!isTrashView && (
+              {!isTrashView && !isHistoryView && (
               <div className="search-sort-container mt-4 sm:mt-6 flex flex-row gap-2">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
@@ -780,9 +795,41 @@ export default function Dashboard() {
               )}
             </div>
   
-            {/* Records Grid */}
+            {/* Main Content */}
             <div className="space-y-4">
-              {isTrashView ? (
+              {isHistoryView ? (
+                <>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                    <div className="flex-1">
+                      <Input
+                        type="text"
+                        placeholder="Search history..."
+                        value={historyFilter}
+                        onChange={(e) => setHistoryFilter(e.target.value)}
+                        className="text-sm sm:text-base"
+                        data-testid="input-search-history"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setHistoryEvents(history.list())}>Refresh</Button>
+                      <Button variant="destructive" disabled={historyEvents.length === 0} onClick={() => history.clear()}>Clear All</Button>
+                    </div>
+                  </div>
+                  {filteredHistory.length === 0 ? (
+                    <div className="text-center py-16 text-muted-foreground">No activity yet</div>
+                  ) : (
+                    filteredHistory.map((e) => (
+                      <div key={e.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm break-words">{e.summary}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{formatHistoryTime(e.timestamp)}</div>
+                        </div>
+                        <Badge variant="secondary" className="shrink-0 text-[10px] uppercase">{e.type}</Badge>
+                      </div>
+                    ))
+                  )}
+                </>
+              ) : isTrashView ? (
                 trashedRecords.length === 0 ? (
                   <div className="text-center py-16 text-muted-foreground">No items in Trash</div>
                 ) : (
@@ -949,56 +996,4 @@ export default function Dashboard() {
   );
 }
 
-function HistoryPanelButton() {
-  const [open, setOpen] = useState(false);
-  const [events, setEvents] = useState(() => history.list());
-
-  useEffect(() => {
-    const refresh = () => setEvents(history.list());
-    window.addEventListener('lockify-history-updated' as any, refresh as any);
-    return () => window.removeEventListener('lockify-history-updated' as any, refresh as any);
-  }, []);
-
-  const formatTime = (ts: number) => new Date(ts).toLocaleString();
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="p-2" title="History">
-          <span className="text-sm">History</span>
-          {events.length > 0 && (
-            <span className="ml-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] h-4 min-w-4 px-1">
-              {Math.min(99, events.length)}
-            </span>
-          )}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Activity History</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">
-          {events.length === 0 ? (
-            <div className="text-center text-muted-foreground py-6">No activity yet</div>
-          ) : (
-            events.map((e) => (
-              <div key={e.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-medium text-sm break-words">{e.summary}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{formatTime(e.timestamp)}</div>
-                </div>
-                <Badge variant="secondary" className="shrink-0 text-[10px] uppercase">{e.type}</Badge>
-              </div>
-            ))
-          )}
-        </div>
-        <DialogFooter>
-          <div className="flex w-full justify-between">
-            <Button variant="outline" onClick={() => setEvents(history.list())}>Refresh</Button>
-            <Button variant="destructive" onClick={() => { history.clear(); setEvents([]); }}>Clear All</Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+// History modal removed; use Profile -> History button to access full page
