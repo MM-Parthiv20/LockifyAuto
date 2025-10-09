@@ -24,9 +24,11 @@ export function DeleteModal({ isOpen, onClose, record }: DeleteModalProps) {
       const res = await apiRequest("PUT", `/api/records/${record.id}`, { isDeleted: true, deletedAt: now });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/records"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/trash"] });
+    onSuccess: (updated: PasswordRecord) => {
+      // Update records cache in place (mark as deleted)
+      const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
+      const next = current.map((r) => (r.id === updated.id ? updated : r));
+      queryClient.setQueryData(["/api/records"], next);
       toast({
         title: "Moved to Trash",
       });

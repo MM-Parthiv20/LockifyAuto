@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertPasswordRecordSchema, loginSchema, onboardingCompleteSchema } from "@shared/schema";
+import { insertUserSchema, insertPasswordRecordSchema, loginSchema, onboardingCompleteSchema, insertHistoryEventSchema } from "@shared/schema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
@@ -155,6 +155,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Record deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete record" });
+    }
+  });
+
+  // History routes
+  app.get("/api/history", authenticateToken, async (req: any, res) => {
+    try {
+      const events = await storage.getHistoryEvents(req.user.userId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch history" });
+    }
+  });
+
+  app.post("/api/history", authenticateToken, async (req: any, res) => {
+    try {
+      const eventData = insertHistoryEventSchema.parse(req.body);
+      const event = await storage.createHistoryEvent({
+        ...eventData,
+        userId: req.user.userId
+      });
+      res.status(201).json(event);
+    } catch (error: any) {
+      if (error.issues) {
+        res.status(400).json({ message: "Validation failed", errors: error.issues });
+      } else {
+        res.status(400).json({ message: "Invalid input data" });
+      }
+    }
+  });
+
+  app.delete("/api/history", authenticateToken, async (req: any, res) => {
+    try {
+      const count = await storage.deleteHistoryEvents(req.user.userId);
+      res.json({ message: `Deleted ${count} history events` });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete history" });
     }
   });
 

@@ -10,6 +10,8 @@ function resolveUrl(url: string): string {
     if (after.startsWith("records/")) return API_BASE + "/locifyauto/" + after.slice("records/".length);
     if (after === "users") return API_BASE + "/users";
     if (after.startsWith("users/")) return API_BASE + "/users/" + after.slice("users/".length);
+    if (after === "history") return "https://677537fa92222241481aee8e.mockapi.io/history";
+    if (after.startsWith("history/")) return "https://677537fa92222241481aee8e.mockapi.io/history/" + after.slice("history/".length);
     return API_BASE + "/" + after;
   }
   return url;

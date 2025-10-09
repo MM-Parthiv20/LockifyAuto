@@ -14,6 +14,8 @@ export default function HistoryPage() {
   useEffect(() => {
     const refresh = () => setEvents(history.list());
     window.addEventListener("lockify-history-updated" as any, refresh as any);
+    // Fetch data from API on mount
+    history.refresh().catch(() => {});
     return () => window.removeEventListener("lockify-history-updated" as any, refresh as any);
   }, []);
 

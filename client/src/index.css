@@ -193,3 +193,79 @@
     }
   }
 }
+
+/* Intro.js theming to match project variables (force override) */
+.introjs-overlay {
+  background: rgb(0 0 0 / 45%) !important;
+}
+
+.introjs-helperLayer {
+  border-radius: var(--radius) !important;
+  box-shadow: 0 0 1px 2px var(--ring), 0 0 0 9999px rgb(0 0 0 / 60%) !important;
+}
+
+.introjs-tooltip {
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.introjs-tooltip-header {
+  border-bottom: 1px solid var(--border) !important;
+  display: none !important;
+}
+
+.introjs-tooltip-title {
+  color: var(--foreground) !important;
+}
+
+.introjs-tooltiptext {
+  color: var(--muted-foreground) !important;
+}
+
+.introjs-bullets ul li a {
+  background: var(--muted) !important;
+}
+.introjs-bullets ul li a.active {
+  background: var(--primary) !important;
+}
+
+.introjs-progressbar {
+  background-color: var(--primary) !important;
+}
+
+/* Hide progress container */
+.introjs-progress {
+  display: none !important;
+}
+
+.introjs-button {
+  border-radius: calc(var(--radius) - 2px) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--secondary) !important;
+  color: var(--secondary-foreground) !important;
+  text-shadow: none !important;
+}
+.introjs-button:hover {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+.introjs-skipbutton {
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  border-color: transparent !important;
+}
+.introjs-nextbutton,
+.introjs-donebutton {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border-color: var(--primary) !important;
+}
+.introjs-nextbutton:hover,
+.introjs-donebutton:hover {
+  filter: brightness(0.95) !important;
+}
+
+

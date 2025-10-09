@@ -17,8 +17,10 @@ export default function Trash() {
       const res = await apiRequest("PUT", `/api/records/${id}`, { isDeleted: false, deletedAt: null });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+    onSuccess: (updated: PasswordRecord) => {
+      const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
+      const next = current.map((r) => (r.id === updated.id ? updated : r));
+      queryClient.setQueryData(["/api/records"], next);
     },
   });
 
@@ -27,8 +29,10 @@ export default function Trash() {
       const res = await apiRequest("DELETE", `/api/records/${id}`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+    onSuccess: (_res, id) => {
+      const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
+      const next = current.filter((r) => r.id !== id);
+      queryClient.setQueryData(["/api/records"], next);
     },
   });
 
@@ -50,10 +54,16 @@ export default function Trash() {
               variant="outline"
               disabled={!hasItems}
               onClick={async () => {
+                const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
                 for (const r of trashed) {
-                  await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
+                  try {
+                    const res = await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
+                    const updated = (await res.json()) as PasswordRecord;
+                    const idx = current.findIndex((c) => c.id === updated.id);
+                    if (idx !== -1) current[idx] = updated;
+                  } catch {}
                 }
-                queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+                queryClient.setQueryData(["/api/records"], [...current]);
               }}
             >
               <RefreshCcw className="w-4 h-4 sm:hidden" />
@@ -63,10 +73,14 @@ export default function Trash() {
               variant="destructive"
               disabled={!hasItems}
               onClick={async () => {
+                let current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
                 for (const r of trashed) {
-                  await apiRequest("DELETE", `/api/records/${r.id}`);
+                  try {
+                    await apiRequest("DELETE", `/api/records/${r.id}`);
+                    current = current.filter((c) => c.id !== r.id);
+                  } catch {}
                 }
-                queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+                queryClient.setQueryData(["/api/records"], current);
               }}
             >
               <Trash2 className="w-4 h-4 sm:hidden" />

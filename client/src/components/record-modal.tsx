@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PasswordRecord, insertPasswordRecordSchema } from "@shared/schema";
 import { validatePassword } from "@/lib/password-validation";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Eye, EyeOff, Check, X, Key } from "lucide-react";
+import { Eye, EyeOff, Check, X, Key, Mail, AtSign, MessageSquare, Camera, Figma, Dribbble, Github, Linkedin, Twitter } from "lucide-react";
 import { history } from "@/lib/history";
 
 interface RecordModalProps {
@@ -21,6 +22,41 @@ interface RecordModalProps {
   onCreateSuccess?: () => void;
 }
 
+// Category options with icons
+export const categoryOptions = [
+  { value: "gmail", label: "Gmail", icon: Mail, color: "text-red-500" },
+  { value: "outlook", label: "Outlook", icon: Mail, color: "text-blue-500" },
+  { value: "yahoo", label: "Yahoo", icon: Mail, color: "text-purple-500" },
+  { value: "protonmail", label: "ProtonMail", icon: Mail, color: "text-purple-600" },
+  { value: "instagram", label: "Instagram", icon: Camera, color: "text-pink-500" },
+  { value: "facebook", label: "Facebook", icon: MessageSquare, color: "text-blue-600" },
+  { value: "twitter", label: "Twitter/X", icon: Twitter, color: "text-sky-500" },
+  { value: "linkedin", label: "LinkedIn", icon: Linkedin, color: "text-blue-700" },
+  { value: "github", label: "GitHub", icon: Github, color: "text-gray-800 dark:text-gray-200" },
+  { value: "figma", label: "Figma", icon: Figma, color: "text-purple-500" },
+  { value: "dribbble", label: "Dribbble", icon: Dribbble, color: "text-pink-500" },
+  { value: "other", label: "Other", icon: AtSign, color: "text-gray-500" },
+];
+
+// Social media platforms that don't require email format
+export const socialMediaPlatforms = ['instagram', 'facebook', 'twitter', 'linkedin', 'github', 'figma', 'dribbble'];
+
+export const isSocialMedia = (userType?: string | null) => {
+  return userType ? socialMediaPlatforms.includes(userType) : false;
+};
+
+export const getCategoryIcon = (userType?: string | null) => {
+  const category = categoryOptions.find(c => c.value === userType);
+  if (!category) return null;
+  const Icon = category.icon;
+  return <Icon className={`h-4 w-4 ${category.color}`} />;
+};
+
+export const getCategoryLabel = (userType?: string | null) => {
+  const category = categoryOptions.find(c => c.value === userType);
+  return category?.label || "Select category";
+};
+
 export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: RecordModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
@@ -28,6 +64,7 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
     email: "",
     password: "",
     description: "",
+    userType: "gmail",
   });
 
   const { toast } = useToast();
@@ -41,12 +78,14 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
           email: record.email,
           password: record.password,
           description: record.description || "",
+          userType: record.userType || "gmail",
         });
       } else {
         setFormData({
           email: "",
           password: "",
           description: "",
+          userType: "gmail",
         });
       }
       setShowPassword(false);
@@ -65,8 +104,12 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
       });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+    onSuccess: (created: PasswordRecord) => {
+      // Close modal first to avoid accidental double submit from rapid UI interactions
+      onClose();
+      // Update cache locally to avoid an extra refetch
+      const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
+      queryClient.setQueryData(["/api/records"], [created, ...current]);
       toast({
         title: "Record created",
         description: "Your password record has been saved successfully",
@@ -79,7 +122,6 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
           onCreateSuccess();
         } catch {}
       }
-      onClose();
     },
     onError: (error: any) => {
       toast({
@@ -99,8 +141,11 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
       });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+    onSuccess: (updated: PasswordRecord) => {
+      // Update cache locally to avoid an extra refetch
+      const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
+      const next = current.map((r) => (r.id === updated.id ? updated : r));
+      queryClient.setQueryData(["/api/records"], next);
       toast({
         title: "Record updated",
         description: "Your password record has been updated successfully",
@@ -119,11 +164,30 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const attemptSave = () => {
     try {
       insertPasswordRecordSchema.parse(formData);
+      // Prevent duplicate emails (case-insensitive) using cached records
+      const existingRecords = queryClient.getQueryData<PasswordRecord[] | undefined>(["/api/records"]) || [];
+      const normalize = (v: string) => v.trim().toLowerCase();
+      const incomingEmail = normalize(formData.email);
+      const hasDuplicate = existingRecords.some((r) => {
+        const sameEmail = normalize(r.email) === incomingEmail;
+        const isActive = !(r as any).isDeleted; // treat missing as active
+        if (!sameEmail || !isActive) return false;
+        if (mode === "edit" && record) {
+          return r.id !== record.id;
+        }
+        return true;
+      });
+      if (hasDuplicate) {
+        onClose();
+        toast({
+          title: "Email already exist",
+          variant: "destructive",
+        });
+        return;
+      }
       
       if (mode === "add") {
         createMutation.mutate(formData);
@@ -137,6 +201,12 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
         variant: "destructive",
       });
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (createMutation.isPending || updateMutation.isPending) return;
+    attemptSave();
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -165,21 +235,29 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
           </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
+
+
           {/* Email Field */}
           <div className="space-y-2">
-            <Label htmlFor="email">Email Address *</Label>
+            <Label htmlFor="email">
+              {isSocialMedia(formData.userType) ? 'Username *' : 'Email Address *'}
+            </Label>
             <Input
               id="email"
               name="email"
-              type="email"
-              placeholder="Enter email address"
+              type={isSocialMedia(formData.userType) ? "text" : "email"}
+              placeholder={isSocialMedia(formData.userType) ? "Enter username" : "Enter email address"}
               value={formData.email}
               onChange={handleChange}
               required
               data-testid="input-modal-email"
             />
-            <p className="text-xs text-muted-foreground">Must be a valid email format</p>
+            <p className="text-xs text-muted-foreground">
+              {isSocialMedia(formData.userType) 
+                ? "Enter your username (@ symbol not required)" 
+                : "Must be a valid email format"}
+            </p>
           </div>
           
           {/* Password Field */}
@@ -270,6 +348,43 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
               </div>
             )}
           </div>
+
+          {/* Category Field */}
+          <div className="space-y-2">
+            <Label htmlFor="userType">Category (Optional)</Label>
+            <Select 
+              value={formData.userType} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, userType: value }))}
+            >
+              <SelectTrigger className="w-full" data-testid="select-modal-category">
+                <SelectValue placeholder="Select category">
+                  {formData.userType && (
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon(formData.userType)}
+                      <span>{getCategoryLabel(formData.userType)}</span>
+                    </div>
+                  )}
+                  {!formData.userType && "Select category"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptions.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex items-center gap-2">
+                        <Icon className={`h-4 w-4 ${option.color}`} />
+                        <span>{option.label}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose the platform type (email provider or social media)
+            </p>
+          </div>
           
           {/* Description Field */}
           <div className="space-y-2">
@@ -306,7 +421,7 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
             <Button
               type="submit"
               className="flex-1"
-              disabled={isLoading || !passwordValidation.isValid}
+              disabled={isLoading}
               data-testid="button-modal-save"
             >
               {isLoading ? "Saving..." : "Save Record"}

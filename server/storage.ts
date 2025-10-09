@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type PasswordRecord, type InsertPasswordRecord } from "@shared/schema";
+import { type User, type InsertUser, type PasswordRecord, type InsertPasswordRecord, type HistoryEvent, type InsertHistoryEvent } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { MongoClient, ServerApiVersion } from "mongodb";
 import { randomUUID } from "crypto";
@@ -16,6 +16,11 @@ export interface IStorage {
   createPasswordRecord(record: InsertPasswordRecord & { userId: string }): Promise<PasswordRecord>;
   updatePasswordRecord(id: string, record: Partial<InsertPasswordRecord>, userId: string): Promise<PasswordRecord | undefined>;
   deletePasswordRecord(id: string, userId: string): Promise<boolean>;
+  
+  // History methods
+  getHistoryEvents(userId: string): Promise<HistoryEvent[]>;
+  createHistoryEvent(event: InsertHistoryEvent & { userId: string }): Promise<HistoryEvent>;
+  deleteHistoryEvents(userId: string): Promise<number>;
 }
 
 // Mongo-backed storage
@@ -36,6 +41,8 @@ class MongoStorage implements IStorage {
     const db = this.client.db(this.dbName);
     await db.collection("users").createIndex({ username: 1 }, { unique: true });
     await db.collection("password_records").createIndex({ userId: 1 });
+    await db.collection("history_events").createIndex({ userId: 1 });
+    await db.collection("history_events").createIndex({ timestamp: -1 });
   }
 
   private async getDb() {
@@ -90,7 +97,10 @@ class MongoStorage implements IStorage {
       email: record.email,
       password: record.password,
       description: record.description || null,
+      userType: (record as any).userType || "gmail",
       starred: (record as any).starred ?? false,
+      isDeleted: false,
+      deletedAt: null,
       createdAt: now,
       updatedAt: now,
     } as unknown as PasswordRecord;
@@ -122,12 +132,43 @@ class MongoStorage implements IStorage {
     );
     return res.value || undefined;
   }
+
+  async getHistoryEvents(userId: string): Promise<HistoryEvent[]> {
+    const db = await this.getDb();
+    return db.collection<HistoryEvent>("history_events")
+      .find({ userId })
+      .sort({ timestamp: -1 })
+      .limit(300)
+      .toArray();
+  }
+
+  async createHistoryEvent(event: InsertHistoryEvent & { userId: string }): Promise<HistoryEvent> {
+    const db = await this.getDb();
+    const historyEvent: HistoryEvent = {
+      id: crypto.randomUUID(),
+      userId: event.userId,
+      type: event.type,
+      summary: event.summary,
+      details: event.details || null,
+      timestamp: event.timestamp,
+      createdAt: new Date(),
+    } as unknown as HistoryEvent;
+    await db.collection<HistoryEvent>("history_events").insertOne(historyEvent);
+    return historyEvent;
+  }
+
+  async deleteHistoryEvents(userId: string): Promise<number> {
+    const db = await this.getDb();
+    const result = await db.collection<HistoryEvent>("history_events").deleteMany({ userId });
+    return result.deletedCount;
+  }
 }
 
 // In-memory fallback storage (used if no valid Mongo URI is provided)
 class MemStorage implements IStorage {
   private users: Map<string, User> = new Map();
   private passwordRecords: Map<string, PasswordRecord> = new Map();
+  private historyEvents: Map<string, HistoryEvent> = new Map();
 
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
@@ -168,7 +209,10 @@ class MemStorage implements IStorage {
       email: record.email,
       password: record.password,
       description: record.description || null,
+      userType: (record as any).userType || "gmail",
       starred: (record as any).starred ?? false,
+      isDeleted: false,
+      deletedAt: null,
       createdAt: now,
       updatedAt: now,
     } as unknown as PasswordRecord;
@@ -196,6 +240,33 @@ class MemStorage implements IStorage {
     const updated: User = { ...(user as any), hasCompletedOnboarding } as User;
     this.users.set(userId, updated);
     return updated;
+  }
+
+  async getHistoryEvents(userId: string): Promise<HistoryEvent[]> {
+    return Array.from(this.historyEvents.values())
+      .filter((e) => e.userId === userId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 300);
+  }
+
+  async createHistoryEvent(event: InsertHistoryEvent & { userId: string }): Promise<HistoryEvent> {
+    const historyEvent: HistoryEvent = {
+      id: randomUUID(),
+      userId: event.userId,
+      type: event.type,
+      summary: event.summary,
+      details: event.details || null,
+      timestamp: event.timestamp,
+      createdAt: new Date(),
+    } as unknown as HistoryEvent;
+    this.historyEvents.set(historyEvent.id, historyEvent);
+    return historyEvent;
+  }
+
+  async deleteHistoryEvents(userId: string): Promise<number> {
+    const toDelete = Array.from(this.historyEvents.values()).filter((e) => e.userId === userId);
+    toDelete.forEach((e) => this.historyEvents.delete(e.id));
+    return toDelete.length;
   }
 }
 

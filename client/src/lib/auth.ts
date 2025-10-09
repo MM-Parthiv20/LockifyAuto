@@ -38,7 +38,9 @@ export function useAuth() {
     const expiresAt = options?.preserveExpiry && currentExpiresAt
       ? currentExpiresAt
       : Date.now() + SESSION_DURATION_MS;
-    const value = { user: { ...user, hasCompletedOnboarding: user.hasCompletedOnboarding ?? true }, expiresAt };
+    // Default onboarding status: demo user -> completed; others -> not completed
+    const defaultOnboarding = user.id === 'default' ? true : false;
+    const value = { user: { ...user, hasCompletedOnboarding: user.hasCompletedOnboarding ?? defaultOnboarding }, expiresAt };
     localStorage.setItem(AUTH_KEY, JSON.stringify(value));
     setAuth(value);
     // notify other hook instances in same tab
@@ -109,7 +111,8 @@ export function useAuth() {
         (u) => u.username === credentials.username && u.password === credentials.password,
       );
       if (!match) throw new Error('Invalid credentials');
-      return { id: match.id, username: match.username, profileimage: match.profileimage, hasCompletedOnboarding: true } as User;
+      // For non-default users, default to not completed until they finish onboarding
+      return { id: match.id, username: match.username, profileimage: match.profileimage, hasCompletedOnboarding: false } as User;
     },
     onSuccess: (user) => {
       setLoggedIn(user);
