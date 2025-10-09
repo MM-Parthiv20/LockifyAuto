@@ -21,7 +21,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 
-import Profile from "@/pages/profile";
 import LoadingSpinner from "@/components/loading-spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +32,13 @@ type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 export default function Dashboard() {
   const { theme, setTheme } = useTheme();
   const { user, updateOnboardingStatus } = useAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+
+  // Redirect to login if no user is authenticated
+  if (!user) {
+    setLocation("/login");
+    return null;
+  }
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -42,7 +47,6 @@ export default function Dashboard() {
   const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PasswordRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [showProfile, setShowProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
   const [createdDateRange, setCreatedDateRange] = useState<DateRange | undefined>(undefined);
@@ -84,10 +88,9 @@ export default function Dashboard() {
       if (context?.previous) queryClientRQ.setQueryData(["/api/records"], context.previous);
     },
     onSettled: () => {
-      queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+      // Do not refetch; cache already updated optimistically
       try {
-        // We cannot know final value here precisely, but summarize the toggle action
-        history.add({ type: "record:toggleStar", summary: "Toggled star on a record" });
+        history.add({ type: "record: toggleStar", summary: "Toggled star on a record" });
       } catch {}
     },
   });
@@ -105,6 +108,8 @@ export default function Dashboard() {
   useEffect(() => {
     const refresh = () => setHistoryEvents(history.list());
     window.addEventListener('lockify-history-updated' as any, refresh as any);
+    // Force initial fetch from API so data shows immediately
+    history.refresh().catch(() => {});
     return () => window.removeEventListener('lockify-history-updated' as any, refresh as any);
   }, []);
   const filteredHistory = (() => {
@@ -134,7 +139,7 @@ export default function Dashboard() {
         queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
         toast({ title: "Auto-removed old items", description: `${deletedCount} item(s) older than 30 days were deleted.` });
         try {
-          history.add({ type: "trash:autoDelete", summary: `Auto-deleted ${deletedCount} item(s) from Trash` });
+          history.add({ type: "trash: autoDelete", summary: `Auto-deleted ${deletedCount} item(s) from Trash` });
         } catch {}
       }
     })();
@@ -151,25 +156,152 @@ export default function Dashboard() {
     return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
   };
 
-  // Ensure profile overlay closes when navigating to Trash
-  useEffect(() => {
-    if (location === "/trash" && showProfile) {
-      setShowProfile(false);
-    }
-  }, [location]);
+  // Reusable Intro.js guided tour starter
+  const ensureIntroCss = () => {
+    const id = "introjs-style";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = "https://unpkg.com/intro.js/minified/introjs.min.css";
+    document.head.appendChild(link);
+  };
 
-  // Listen for a global close-profile event (emitted from Profile Trash button)
+  const startTour = async () => {
+    try {
+      ensureIntroCss();
+      const mod: any = await import("intro.js");
+      const intro = (mod.default || mod.introJs)();
+      intro.setOptions({
+        // lock down interactions outside the tooltip
+        disableInteraction: true,
+        exitOnOverlayClick: false,
+        exitOnEsc: true,
+        // controls and labels
+        showButtons: true,
+        showBullets: true,
+        showProgress: true,
+        skipLabel: "Skip Tour",
+        nextLabel: "Next →",
+        prevLabel: "← Back",
+        doneLabel: "Get Started! 🎉",
+        // Position and appearance
+        tooltipPosition: "auto",
+        positionPrecedence: ["bottom", "top", "right", "left"],
+        scrollToElement: true,
+        scrollPadding: 30,
+        overlayOpacity: 0.8,
+        // Steps with detailed content
+        steps: [
+          { 
+            title: "👋 Welcome to Lumora!",
+            intro: "Let's take a quick guided tour to show you around. You'll learn how to manage your passwords securely and efficiently. This tour takes about 2 minutes. Ready? Let's go!" 
+          },
+          { 
+            element: "#tour-avatar", 
+            title: "👤 Your Profile Center",
+            intro: "Click here to access your profile settings, activity history, and account preferences. You can also see your current avatar and username.",
+            position: "bottom"
+          },
+          { 
+            element: "#tour-search", 
+            title: "🔍 Quick Search",
+            intro: "Instantly find any password by typing an email address or description. The search updates in real-time as you type, making it easy to locate what you need.",
+            position: "bottom"
+          },
+          { 
+            element: "#tour-sort", 
+            title: "📊 Sort & Organize",
+            intro: "Sort your passwords by newest, oldest, email (A-Z), recently updated, or starred first. Keep your most important passwords at the top!",
+            position: "bottom"
+          },
+          { 
+            element: "#tour-filters", 
+            title: "🎯 Advanced Filters",
+            intro: "Narrow down your results using powerful filters:<br/>• Filter by creation date range<br/>• Filter by email domain (gmail.com, etc.)<br/>• Show only records with descriptions<br/>• Show only starred items",
+            position: "bottom"
+          },
+          { 
+            element: "#tour-password-generator", 
+            title: "🔑 Password Generator",
+            intro: "Generate ultra-secure passwords with customizable options:<br/>• Adjust length (8-128 characters)<br/>• Include uppercase, lowercase, numbers, symbols<br/>• Copy with one click<br/>Never reuse weak passwords again!",
+            position: "left"
+          },
+          { 
+            element: "#tour-add-record", 
+            title: "➕ Add Your First Password",
+            intro: "Click here to store a new password record. Each record includes:<br/>• Email address<br/>• Password (securely encrypted)<br/>• Optional description<br/>• Star to mark as important<br/><br/>All your data is encrypted with military-grade security!",
+            position: "left"
+          },
+        ],
+      });
+      const injectSkipButton = () => {
+        try {
+          const tooltips = document.querySelectorAll('.introjs-tooltip');
+          if (!tooltips.length) return;
+          const btnContainers = document.querySelectorAll('.introjs-tooltipbuttons');
+          btnContainers.forEach((container) => {
+            if (!container.querySelector('.introjs-custom-skip')) {
+              const skipBtn = document.createElement('a');
+              skipBtn.className = 'introjs-button introjs-custom-skip';
+              skipBtn.textContent = 'Skip';
+              skipBtn.addEventListener('click', () => intro.exit());
+              container.appendChild(skipBtn);
+            }
+          });
+        } catch {}
+      };
+      
+      const markComplete = async () => { 
+        try { 
+          await updateOnboardingStatus(true); 
+        } catch {} 
+      };
+      
+      intro.oncomplete(async () => {
+        await markComplete();
+        try { 
+          sessionStorage.setItem('lockify-tour-done', '1'); 
+        } catch {}
+        (window as any).__lockifyTourRunning = false;
+      });
+      
+      intro.onexit(async () => {
+        // Mark as complete even when exiting/skipping to prevent tour from repeating
+        await markComplete();
+        try { 
+          sessionStorage.setItem('lockify-tour-done', '1'); 
+        } catch {}
+        (window as any).__lockifyTourRunning = false;
+      });
+      
+      intro.onafterchange(injectSkipButton);
+      intro.onchange(injectSkipButton);
+      
+      (window as any).__lockifyTourRunning = true;
+      intro.start();
+      // ensure first step has skip
+      setTimeout(injectSkipButton, 0);
+    } catch (error) {
+      console.error("Tour initialization failed:", error);
+    }
+  };
+
+  // Expose manual trigger for editing/QA
   useEffect(() => {
-    const close = () => setShowProfile(false);
-    window.addEventListener('lockify-close-profile' as any, close as any);
-    return () => window.removeEventListener('lockify-close-profile' as any, close as any);
+    (window as any).startLockifyTutorial = startTour;
   }, []);
 
-  // Open onboarding if user hasn't completed it
+  // Auto-run tour for first-time users
   useEffect(() => {
-    if (user && !user.hasCompletedOnboarding) {
-      setIsOnboardingOpen(true);
-    }
+    if (!user) return;
+    try {
+      const done = sessionStorage.getItem('lockify-tour-done');
+      if (user.hasCompletedOnboarding || done === '1') return;
+      if ((window as any).__lockifyTourRunning) return;
+    } catch {}
+    const t = window.setTimeout(() => { if (!(window as any).__lockifyTourRunning) startTour(); }, 300);
+    return () => window.clearTimeout(t);
   }, [user]);
   useEffect(() => {
     if (filterOpen) setShowCalendar(false);
@@ -335,7 +467,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Brand */}
-            <div className="flex items-center space-x-2" onClick={() => setShowProfile(false)}>
+            <div className="flex items-center space-x-2" onClick={() => setLocation("/")}>
               <div className="bg-primary/10 rounded-lg text-primary">
               <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-9 h-9 text-primary" fill="currentColor">
               <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
@@ -347,6 +479,19 @@ export default function Dashboard() {
             
             {/* Right Side Controls */}
             <div className="flex items-center space-x-2 sm:space-x-4">
+
+              {/* Manual Start Tour */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => startTour()}
+                className="p-2"
+                data-testid="button-start-tour"
+              >
+                <span className="hidden sm:inline">Start tour</span>
+                <span className="sm:hidden">Tour</span>
+              </Button>
+
               {/* Dark Mode Toggle */}
               <Button
                 variant="ghost"
@@ -360,26 +505,34 @@ export default function Dashboard() {
 
               {/* Trash actions moved to content header */}
 
+
+
               {/* User avatar and username */}
               {user && (
-                <div className="flex items-center gap-2 pr-1 cursor-pointer" onClick={() => setShowProfile(!showProfile)}>
-                  {isLoading && <Loader2 className="animate-spin w-8 h-8 text-muted-foreground" />}
-                  <img
-                    src={avatarUrl}
-                    alt="avatar"
-                    className="w-7 h-7 rounded-full border"
-                    onLoad={() => setLoading(false)}
-                    onError={() => setLoading(false)}
-                  />
-                  <span className="hidden sm:flex text-sm text-foreground">{user.username}</span>
+                <div id="tour-avatar" className="flex items-center gap-2 pr-1 cursor-pointer" onClick={() => setLocation("/profile")}>
+                  <div className="relative w-7 h-7">
+                    {loading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-full">
+                        <Loader2 className="animate-spin w-4 h-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <img
+                      src={avatarUrl}
+                      alt="avatar"
+                      className={`w-7 h-7 rounded-full border ${loading ? 'opacity-0' : 'opacity-100'}`}
+                      onLoad={() => setLoading(false)}
+                      onError={() => setLoading(false)}
+                    />
+                  </div>
+                  <span className="hidden sm:inline text-sm text-foreground">{user.username}</span>
                 </div>
               )}
               
               {/* Profile Toggle */}
               <Button
-                variant={showProfile ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
-                onClick={() => setShowProfile(!showProfile)}
+                onClick={() => setLocation("/profile")}
                 className="hidden p-2 bg-primary text-primary-foreground"
                 data-testid="button-profile-toggle"
               >
@@ -399,28 +552,25 @@ export default function Dashboard() {
   
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {showProfile ? (
-          <Profile onBack={() => setShowProfile(false)} />
-        ) : (
-          <div>
-            <div className="mb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-2 w-full">
-                  {(isTrashView || isHistoryView) && (
-                    <ArrowLeft
-                      className="w-8 h-8 rounded-md bg-primary/10 p-1 cursor-pointer"
-                      onClick={() => {
-                        // If coming from /trash, go back to main dashboard
-                        window.location.href = "/";
-                      }}
-                      data-testid="button-back-from-trash"
-                    />
-                  )}
-                  <div>
-                    <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-                      {isTrashView ? "Trash" : isHistoryView ? "Activity History" : "Your Passwords"}
-                    </h2>
-                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+        <div>
+          <div className="mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-2 w-full">
+                {(isTrashView || isHistoryView) && (
+                  <ArrowLeft
+                    className="w-8 h-8 rounded-md bg-primary/10 p-1 cursor-pointer"
+                    onClick={() => {
+                      // Navigate back to main dashboard without full reload
+                      setLocation("/");
+                    }}
+                    data-testid="button-back-from-trash"
+                  />
+                )}
+                <div>
+                  <h2 className="text-xl sm:text-3xl font-bold text-foreground">
+                    {isTrashView ? "Trash" : isHistoryView ? "Activity History" : "Your Passwords"}
+                  </h2>
+                  <p className="text-muted-foreground text-sm sm:text-base">
                       {isTrashView || isHistoryView ? "" : "Manage your email and password records securely"}
                     </p>
                  
@@ -442,7 +592,7 @@ export default function Dashboard() {
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
                             toast({ title: "Restored items", description: `${count} item(s) restored from Trash.` });
                             try {
-                              history.add({ type: "record:restore", summary: `Restored ${count} item(s) from Trash` });
+                              history.add({ type: "record: restore", summary: `Restored ${count} item(s) from Trash` });
                             } catch {}
                           } catch (e: any) {
                             toast({ title: "Restore failed", description: e?.message || "Could not restore all items.", variant: "destructive" });
@@ -459,7 +609,7 @@ export default function Dashboard() {
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
                             toast({ title: "Trash emptied", description: `${count} item(s) permanently deleted.` });
                             try {
-                              history.add({ type: "trash:empty", summary: `Emptied Trash: ${count} item(s)` });
+                              history.add({ type: "trash: empty", summary: `Emptied Trash: ${count} item(s)` });
                             } catch {}
                           } catch (e: any) {
                             toast({ title: "Empty Trash failed", description: e?.message || "Could not delete all items.", variant: "destructive" });
@@ -478,6 +628,7 @@ export default function Dashboard() {
                 <div className="mobile-button-group flex flex-row gap-2">
               
                       <Button 
+                        id="tour-password-generator"
                         onClick={() => setIsPasswordGeneratorOpen(true)}
                         variant="outline"
                         className="btn flex items-center justify-center"
@@ -490,6 +641,7 @@ export default function Dashboard() {
                         </span>
                       </Button>
                       <Button 
+                        id="tour-add-record"
                         onClick={handleAddRecord}
                         className="btn flex items-center justify-center"
                         data-testid="button-add-record"
@@ -506,7 +658,7 @@ export default function Dashboard() {
               {/* Search, Sort and Filters */}
               {!isTrashView && !isHistoryView && (
               <div className="search-sort-container mt-4 sm:mt-6 flex flex-row gap-2">
-                <div className="flex-1 relative">
+                <div className="flex-1 relative" id="tour-search">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                   <Input
                     type="text"
@@ -519,7 +671,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex gap-2 items-stretch">
                 <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-                    <SelectTrigger className="relative w-full" data-testid="select-sort">
+                    <SelectTrigger id="tour-sort" className="relative w-full" data-testid="select-sort">
                       <ArrowUpDown className="w-4 h-4" />
                       <span className="ml-2 !hidden sm:!inline whitespace-nowrap">
                         <SelectValue placeholder="Sort by..." />
@@ -538,7 +690,7 @@ export default function Dashboard() {
                   </Select>
                   <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="relative" data-testid="button-filters">
+                      <Button id="tour-filters" variant="outline" className="relative" data-testid="button-filters">
                         <Filter className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span className="ml-2 hidden sm:inline">Filters</span>
                         {activeFilterCount > 0 && (
@@ -875,7 +1027,7 @@ export default function Dashboard() {
                             await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
                             try {
-                              history.add({ type: "record:restore", summary: `Restored: ${r.email}`, details: { id: r.id } });
+                              history.add({ type: "record: restore", summary: `Restored: ${r.email}`, details: { id: r.id } });
                             } catch {}
                           }}
                         >
@@ -890,7 +1042,7 @@ export default function Dashboard() {
                             await apiRequest("DELETE", `/api/records/${r.id}`);
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
                             try {
-                              history.add({ type: "record:delete", summary: `Permanently deleted: ${r.email}`, details: { id: r.id } });
+                              history.add({ type: "record: delete", summary: `Permanently deleted: ${r.email}`, details: { id: r.id } });
                             } catch {}
                           }}
                         >
@@ -958,7 +1110,6 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-        )}
       </main>
   
       {/* Modals */}

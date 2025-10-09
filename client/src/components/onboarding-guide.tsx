@@ -13,7 +13,7 @@ interface OnboardingGuideProps {
 const onboardingSteps = [
   {
     title: "Welcome to Lumora",
-    description: "Your secure password manager is ready to protect your digital life.",
+    description: "Your secure password manager.",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -27,25 +27,25 @@ const onboardingSteps = [
         <path d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
       </svg>
     ),
-    content: "Lumora keeps your passwords safe with military-grade encryption. All your data is protected by your master password.",
+    content: "Keep your passwords safe with encryption protected by your master password.",
   },
   {
     title: "Add Your First Password",
-    description: "Start by storing your first email and password combination.",
+    description: "Store your credentials securely.",
     icon: Plus,
-    content: "Click the 'Add New Record' button to store your first password. Each record contains an email, password, and optional description.",
+    content: "Click 'Add New Record' to store email, password, and description.",
   },
   {
     title: "Use the Password Generator",
-    description: "Generate strong, secure passwords for better protection.",
+    description: "Generate strong passwords instantly.",
     icon: Key,
-    content: "Use our built-in password generator to create strong, unique passwords for each of your accounts. The generator allows you to customize length and character types.",
+    content: "Create unique passwords with customizable length and character types.",
   },
   {
     title: "Search and Organize",
-    description: "Quickly find your passwords when you need them.",
+    description: "Find your passwords quickly.",
     icon: Search,
-    content: "Use the search bar to quickly find specific records by email or description. You can also sort and filter your records for better organization.",
+    content: "Use the search bar to find records by email or description.",
   },
 ];
 
