@@ -136,17 +136,10 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
       <div className="space-y-2 sm:space-y-3 p-2 sm:p-0 pt-0">
         {/* Email Field - Compact */}
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between hidden sm:flex">
             <label className="text-xs font-medium text-muted-foreground">
               {isSocialMedia(record.userType) ? 'Username' : 'Email'}
             </label>
-            {/* Category Icon for desktop - shown inline with label */}
-            {record.userType && (
-              <div className="hidden sm:flex items-center gap-1.5" title={getCategoryLabel(record.userType)}>
-                {getCategoryIcon(record.userType)}
-                <span className="text-xs text-muted-foreground">{getCategoryLabel(record.userType)}</span>
-              </div>
-            )}
           </div>
           <div className="flex items-center space-x-2">
             <div className="flex-1 bg-muted rounded px-3 py-2 font-mono text-sm break-all min-w-0" data-testid={`text-email-${record.id}`}>
@@ -167,7 +160,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
         
         {/* Password Field - Compact */}
         <div className="space-y-0.5 sm:space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Password</label>
+          <label className="text-xs font-medium text-muted-foreground hidden sm:block">Password</label>
           <div className="flex items-center space-x-2">
             <div className="flex-1 bg-muted rounded px-3 py-2 font-mono text-sm break-all min-w-0" data-testid={`text-password-${record.id}`}>
               {showPassword ? record.password : "••••••••••••"}
@@ -198,7 +191,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
         {/* Description Field - Compact (only if exists) */}
         {record.description && (
           <div className="space-y-0.5 sm:space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Description</label>
+            <label className="text-xs font-medium text-muted-foreground hidden sm:block">Description</label>
             <div className="flex items-start space-x-2">
               <div className="flex-1 bg-muted rounded px-3 py-2 text-sm break-words min-w-0" data-testid={`text-description-${record.id}`}>
                 {record.description}
@@ -249,6 +242,13 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
               <Trash2 className="w-3 h-3" />
             </Button>
           </div>
+            {/* Category Icon for desktop - shown inline with label */}
+            {record.userType && (
+              <div className="hidden sm:flex items-center gap-1.5" title={getCategoryLabel(record.userType)}>
+                {getCategoryIcon(record.userType)}
+                <span className="text-xs text-muted-foreground">{getCategoryLabel(record.userType)}</span>
+              </div>
+            )}
         </div>
       </div>
       
