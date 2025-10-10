@@ -224,6 +224,9 @@
 .introjs-tooltiptext {
   color: var(--muted-foreground) !important;
 }
+.introjs-bullets{
+  padding-top: 0 !important;
+}
 
 .introjs-bullets ul li a {
   background: var(--muted) !important;
@@ -266,6 +269,19 @@
 .introjs-nextbutton:hover,
 .introjs-donebutton:hover {
   filter: brightness(0.95) !important;
+}
+
+/* Custom Intro.js tooltip width */
+.intro-tooltip-wide {
+  min-width: 400px !important;
+  max-width: 300px !important;
+}
+
+@media (max-width: 640px) {
+  .intro-tooltip-wide {
+    min-width: 280px !important;
+    max-width: 320px !important;
+  }
 }
 
 

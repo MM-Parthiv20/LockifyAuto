@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { PasswordRecord, insertPasswordRecordSchema } from "@shared/schema";
 import { validatePassword } from "@/lib/password-validation";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Eye, EyeOff, Check, X, Key, Mail, AtSign, MessageSquare, Camera, Figma, Dribbble, Github, Linkedin, Twitter } from "lucide-react";
+import { Eye, EyeOff, Check, X, Key } from "lucide-react";
 import { history } from "@/lib/history";
 
 interface RecordModalProps {
@@ -22,24 +22,37 @@ interface RecordModalProps {
   onCreateSuccess?: () => void;
 }
 
-// Category options with icons
+// Category options with custom image icons
 export const categoryOptions = [
-  { value: "gmail", label: "Gmail", icon: Mail, color: "text-red-500" },
-  { value: "outlook", label: "Outlook", icon: Mail, color: "text-blue-500" },
-  { value: "yahoo", label: "Yahoo", icon: Mail, color: "text-purple-500" },
-  { value: "protonmail", label: "ProtonMail", icon: Mail, color: "text-purple-600" },
-  { value: "instagram", label: "Instagram", icon: Camera, color: "text-pink-500" },
-  { value: "facebook", label: "Facebook", icon: MessageSquare, color: "text-blue-600" },
-  { value: "twitter", label: "Twitter/X", icon: Twitter, color: "text-sky-500" },
-  { value: "linkedin", label: "LinkedIn", icon: Linkedin, color: "text-blue-700" },
-  { value: "github", label: "GitHub", icon: Github, color: "text-gray-800 dark:text-gray-200" },
-  { value: "figma", label: "Figma", icon: Figma, color: "text-purple-500" },
-  { value: "dribbble", label: "Dribbble", icon: Dribbble, color: "text-pink-500" },
-  { value: "other", label: "Other", icon: AtSign, color: "text-gray-500" },
+  { value: "gmail", label: "Gmail", imagePath: "/images/social_icons/Google.png" },
+  { value: "outlook", label: "Outlook", imagePath: "/images/social_icons/Outlook.png" },
+  { value: "yahoo", label: "Yahoo", imagePath: "/images/social_icons/others.png" },
+  { value: "protonmail", label: "ProtonMail", imagePath: "/images/social_icons/others.png" },
+  { value: "instagram", label: "Instagram", imagePath: "/images/social_icons/Instagram.png" },
+  { value: "facebook", label: "Facebook", imagePath: "/images/social_icons/Facebook.png" },
+  { value: "X", label: "X", imagePath: "/images/social_icons/X.png" },
+  { value: "linkedin", label: "LinkedIn", imagePath: "/images/social_icons/Linkedin.png" },
+  { value: "github", label: "GitHub", imagePath: "/images/social_icons/Github.png" },
+  { value: "figma", label: "Figma", imagePath: "/images/social_icons/Figma.png" },
+  { value: "dribbble", label: "Dribbble", imagePath: "/images/social_icons/Dribbble.png" },
+  { value: "apple", label: "Apple", imagePath: "/images/social_icons/Apple.png" },
+  { value: "amazon", label: "Amazon", imagePath: "/images/social_icons/Amazon.png" },
+  { value: "discord", label: "Discord", imagePath: "/images/social_icons/Discord.png" },
+  { value: "reddit", label: "Reddit", imagePath: "/images/social_icons/Reddit.png" },
+  { value: "spotify", label: "Spotify", imagePath: "/images/social_icons/Spotify.png" },
+  { value: "youtube", label: "YouTube", imagePath: "/images/social_icons/YouTube.png" },
+  { value: "tiktok", label: "TikTok", imagePath: "/images/social_icons/TikTok.png" },
+  { value: "snapchat", label: "Snapchat", imagePath: "/images/social_icons/Snapchat.png" },
+  { value: "whatsapp", label: "WhatsApp", imagePath: "/images/social_icons/WhatsApp.png" },
+  { value: "telegram", label: "Telegram", imagePath: "/images/social_icons/Telegram.png" },
+  { value: "pinterest", label: "Pinterest", imagePath: "/images/social_icons/Pinterest.png" },
+  { value: "medium", label: "Medium", imagePath: "/images/social_icons/Medium.png" },
+  { value: "twitch", label: "Twitch", imagePath: "/images/social_icons/Twitch.png" },
+  { value: "other", label: "Other", imagePath: "/images/social_icons/others.png" },
 ];
 
 // Social media platforms that don't require email format
-export const socialMediaPlatforms = ['instagram', 'facebook', 'twitter', 'linkedin', 'github', 'figma', 'dribbble'];
+export const socialMediaPlatforms = ['instagram', 'facebook', 'X', 'linkedin', 'github', 'figma', 'dribbble', 'discord', 'reddit', 'spotify', 'youtube', 'tiktok', 'snapchat', 'whatsapp', 'telegram', 'pinterest', 'medium', 'twitch'];
 
 export const isSocialMedia = (userType?: string | null) => {
   return userType ? socialMediaPlatforms.includes(userType) : false;
@@ -48,8 +61,17 @@ export const isSocialMedia = (userType?: string | null) => {
 export const getCategoryIcon = (userType?: string | null) => {
   const category = categoryOptions.find(c => c.value === userType);
   if (!category) return null;
-  const Icon = category.icon;
-  return <Icon className={`h-4 w-4 ${category.color}`} />;
+  return (
+    <img 
+      src={category.imagePath} 
+      alt={category.label}
+      className="h-5 w-5 object-contain"
+      onError={(e) => {
+        // Fallback to a default icon if image fails to load
+        (e.target as HTMLImageElement).style.display = 'none';
+      }}
+    />
+  );
 };
 
 export const getCategoryLabel = (userType?: string | null) => {
@@ -115,7 +137,7 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
         description: "Your password record has been saved successfully",
       });
       try {
-        history.add({ type: "record:create", summary: `Created record for ${formData.email}`, details: { email: formData.email } });
+        history.add({ type: "record: create", summary: `Created record for ${formData.email}`, details: { email: formData.email } });
       } catch {}
       if (onCreateSuccess) {
         try {
@@ -151,7 +173,7 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
         description: "Your password record has been updated successfully",
       });
       try {
-        history.add({ type: "record:update", summary: `Updated record ${record?.email || formData.email}`, details: { id: record?.id } });
+        history.add({ type: "record: update", summary: `Updated record ${record?.email || formData.email}`, details: { id: record?.id } });
       } catch {}
       onClose();
     },
@@ -367,13 +389,16 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
                   {!formData.userType && "Select category"}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[240px] overflow-y-auto">
                 {categoryOptions.map((option) => {
-                  const Icon = option.icon;
                   return (
                     <SelectItem key={option.value} value={option.value}>
                       <div className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${option.color}`} />
+                        <img 
+                          src={option.imagePath} 
+                          alt={option.label}
+                          className="h-4 w-4 object-contain"
+                        />
                         <span>{option.label}</span>
                       </div>
                     </SelectItem>

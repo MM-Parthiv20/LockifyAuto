@@ -39,8 +39,35 @@ export default function Dashboard() {
     setLocation("/login");
     return null;
   }
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  // Load filter settings from sessionStorage on mount
+  const loadFilterSettings = () => {
+    try {
+      const saved = sessionStorage.getItem('lockify-filter-settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          searchQuery: parsed.searchQuery || "",
+          sortBy: parsed.sortBy || "newest",
+          createdDateRange: parsed.createdDateRange ? {
+            from: parsed.createdDateRange.from ? new Date(parsed.createdDateRange.from) : undefined,
+            to: parsed.createdDateRange.to ? new Date(parsed.createdDateRange.to) : undefined,
+          } : undefined,
+          selectedDomains: parsed.selectedDomains || [],
+          hasDescriptionOnly: parsed.hasDescriptionOnly || false,
+          starredOnly: parsed.starredOnly || false,
+          selectedCategories: parsed.selectedCategories || [],
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load filter settings:', e);
+    }
+    return null;
+  };
+
+  const savedSettings = loadFilterSettings();
+
+  const [searchQuery, setSearchQuery] = useState(savedSettings?.searchQuery || "");
+  const [sortBy, setSortBy] = useState<SortOption>(savedSettings?.sortBy || "newest");
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -49,13 +76,15 @@ export default function Dashboard() {
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [createdDateRange, setCreatedDateRange] = useState<DateRange | undefined>(undefined);
+  const [createdDateRange, setCreatedDateRange] = useState<DateRange | undefined>(savedSettings?.createdDateRange);
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
   const [activeDateField, setActiveDateField] = useState<"from" | "to" | null>(null);
   const [domainInput, setDomainInput] = useState("");
-  const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
-  const [hasDescriptionOnly, setHasDescriptionOnly] = useState<boolean>(false);
-  const [starredOnly, setStarredOnly] = useState<boolean>(false);
+  const [selectedDomains, setSelectedDomains] = useState<string[]>(savedSettings?.selectedDomains || []);
+  const [hasDescriptionOnly, setHasDescriptionOnly] = useState<boolean>(savedSettings?.hasDescriptionOnly || false);
+  const [starredOnly, setStarredOnly] = useState<boolean>(savedSettings?.starredOnly || false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(savedSettings?.selectedCategories || []);
+  const [isMoreCategoriesModalOpen, setIsMoreCategoriesModalOpen] = useState(false);
   const domainInputRef = useRef<HTMLInputElement | null>(null);
   const calendarRef = useRef<HTMLDivElement | null>(null);
   const wasEmptyBeforeAddRef = useRef<boolean>(false);
@@ -118,6 +147,27 @@ export default function Dashboard() {
     return historyEvents.filter(e => e.summary.toLowerCase().includes(q) || e.type.toLowerCase().includes(q));
   })();
   const formatHistoryTime = (ts: number) => new Date(ts).toLocaleString();
+
+  // Save filter settings to sessionStorage whenever they change
+  useEffect(() => {
+    try {
+      const filterSettings = {
+        searchQuery,
+        sortBy,
+        createdDateRange: createdDateRange ? {
+          from: createdDateRange.from?.toISOString(),
+          to: createdDateRange.to?.toISOString(),
+        } : undefined,
+        selectedDomains,
+        hasDescriptionOnly,
+        starredOnly,
+        selectedCategories,
+      };
+      sessionStorage.setItem('lockify-filter-settings', JSON.stringify(filterSettings));
+    } catch (e) {
+      console.error('Failed to save filter settings:', e);
+    }
+  }, [searchQuery, sortBy, createdDateRange, selectedDomains, hasDescriptionOnly, starredOnly, selectedCategories]);
 
   // Auto-delete trashed records older than 30 days when viewing Trash
   useEffect(() => {
@@ -184,7 +234,7 @@ export default function Dashboard() {
         skipLabel: "Skip Tour",
         nextLabel: "Next →",
         prevLabel: "← Back",
-        doneLabel: "Get Started! 🎉",
+        doneLabel: "Get Started!",
         // Position and appearance
         tooltipPosition: "auto",
         positionPrecedence: ["bottom", "top", "right", "left"],
@@ -192,45 +242,46 @@ export default function Dashboard() {
         scrollPadding: 30,
         overlayOpacity: 0.8,
         // Steps with detailed content
+        tooltipClass: "intro-tooltip-wide",
         steps: [
           { 
-            title: "👋 Welcome to Lumora!",
-            intro: "Let's take a quick guided tour to show you around. You'll learn how to manage your passwords securely and efficiently. This tour takes about 2 minutes. Ready? Let's go!" 
+            title: "Welcome to Lockify",
+            intro: "Secure password management solution. This tour covers essential features." 
           },
           { 
             element: "#tour-avatar", 
-            title: "👤 Your Profile Center",
-            intro: "Click here to access your profile settings, activity history, and account preferences. You can also see your current avatar and username.",
+            title: "Profile & Account",
+            intro: "Access settings, history, and preferences via your avatar.",
             position: "bottom"
           },
           { 
             element: "#tour-search", 
-            title: "🔍 Quick Search",
-            intro: "Instantly find any password by typing an email address or description. The search updates in real-time as you type, making it easy to locate what you need.",
+            title: "Search",
+            intro: "Locate credentials by email, username, or description in real-time.",
             position: "bottom"
           },
           { 
             element: "#tour-sort", 
-            title: "📊 Sort & Organize",
-            intro: "Sort your passwords by newest, oldest, email (A-Z), recently updated, or starred first. Keep your most important passwords at the top!",
+            title: "Sorting",
+            intro: "Sort by date, email (A-Z), last update, or starred items.",
             position: "bottom"
           },
           { 
             element: "#tour-filters", 
-            title: "🎯 Advanced Filters",
-            intro: "Narrow down your results using powerful filters:<br/>• Filter by creation date range<br/>• Filter by email domain (gmail.com, etc.)<br/>• Show only records with descriptions<br/>• Show only starred items",
+            title: "Advanced Filters",
+            intro: "Filter by date range, domain, description, or starred items.",
             position: "bottom"
           },
           { 
             element: "#tour-password-generator", 
-            title: "🔑 Password Generator",
-            intro: "Generate ultra-secure passwords with customizable options:<br/>• Adjust length (8-128 characters)<br/>• Include uppercase, lowercase, numbers, symbols<br/>• Copy with one click<br/>Never reuse weak passwords again!",
+            title: "Password Generator",
+            intro: "Generate secure passwords with customizable length (8-128) and character types.",
             position: "left"
           },
           { 
             element: "#tour-add-record", 
-            title: "➕ Add Your First Password",
-            intro: "Click here to store a new password record. Each record includes:<br/>• Email address<br/>• Password (securely encrypted)<br/>• Optional description<br/>• Star to mark as important<br/><br/>All your data is encrypted with military-grade security!",
+            title: "Add Password",
+            intro: "Store encrypted passwords with email, description, and star marking.",
             position: "left"
           },
         ],
@@ -363,6 +414,7 @@ export default function Dashboard() {
     if (selectedDomains.length > 0) n += 1;
     if (hasDescriptionOnly) n += 1;
     if (starredOnly) n += 1;
+    if (selectedCategories.length > 0) n += 1;
     return n;
   })();
 
@@ -388,7 +440,10 @@ export default function Dashboard() {
       // Starred filter
       const starOk = !starredOnly || Boolean((record as any).starred);
 
-      return matchesQuery && fromOk && toOk && domainOk && descOk && starOk;
+      // Category filter
+      const categoryOk = selectedCategories.length === 0 || selectedCategories.includes((record as any).userType || "gmail");
+
+      return matchesQuery && fromOk && toOk && domainOk && descOk && starOk && categoryOk;
     });
 
     // Sort records
@@ -625,7 +680,7 @@ export default function Dashboard() {
                 {/* Action Buttons */}
                 {isTrashView || isHistoryView ? "" : (
                     <>
-                <div className="mobile-button-group flex flex-row gap-2">
+                <div className="mobile-button-group flex flex-row gap-2 hidden xl:flex">
               
                       <Button 
                         id="tour-password-generator"
@@ -654,6 +709,29 @@ export default function Dashboard() {
                    </>
                   )}
               </div>
+              
+              {/* floating Add record and password generator */}
+              <div className="floating-button-group fixed bottom-4 right-4 xl:hidden flex flex-col gap-3 items-end">
+                <Button
+                  onClick={() => setIsPasswordGeneratorOpen(true)}
+                  className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#A889B3] text-black shadow-[0_10px_20px_rgba(0,0,0,0.35)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.45)] transition-transform duration-200 active:translate-y-0.5"
+                  size="icon"
+                  data-testid="button-password-generator"
+                >
+                  <Key className="w-6 h-6" />
+                </Button>
+                <Button
+                  onClick={() => handleAddRecord()}
+                  className="flex items-center justify-center sm:w-20 sm:h-20 w-16 h-16 xl:rounded-3xl rounded-2xl bg-[#8AA0D8] text-black shadow-[0_14px_28px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform duration-200 active:translate-y-0.5"
+                  data-testid="button-add-record"
+                >
+                  <Plus className="w-9 h-9" />
+                </Button>
+              </div>
+             
+           
+
+              
               
               {/* Search, Sort and Filters */}
               {!isTrashView && !isHistoryView && (
@@ -922,6 +1000,92 @@ export default function Dashboard() {
                           <label htmlFor="starred-only" className="text-sm">Starred only</label>
                         </div>
 
+                        {/* Category filter */}
+                        <div>
+                          <div className="text-sm font-medium text-foreground mb-2">Category</div>
+                          <div className="flex flex-wrap gap-2">
+                            {["gmail", "outlook", "github", "facebook"].map((category) => {
+                              const active = selectedCategories.includes(category);
+                              // Get category icon from record-modal
+                              const categoryData = (() => {
+                                const categoryMap: Record<string, string> = {
+                                  gmail: "/images/social_icons/Google.png",
+                                  outlook: "/images/social_icons/Outlook.png",
+                                  yahoo: "/images/social_icons/others.png",
+                                  github: "/images/social_icons/Github.png",
+                                  facebook: "/images/social_icons/Facebook.png",
+                                  X: "/images/social_icons/X.png",
+                                  linkedin: "/images/social_icons/Linkedin.png",
+                                  instagram: "/images/social_icons/Instagram.png",
+                                  figma: "/images/social_icons/Figma.png",
+                                  dribbble: "/images/social_icons/Dribbble.png",
+                                  discord: "/images/social_icons/Discord.png",
+                                  reddit: "/images/social_icons/Reddit.png",
+                                  spotify: "/images/social_icons/Spotify.png",
+                                  youtube: "/images/social_icons/YouTube.png",
+                                  tiktok: "/images/social_icons/TikTok.png",
+                                  snapchat: "/images/social_icons/Snapchat.png",
+                                  whatsapp: "/images/social_icons/WhatsApp.png",
+                                  telegram: "/images/social_icons/Telegram.png",
+                                  pinterest: "/images/social_icons/Pinterest.png",
+                                  medium: "/images/social_icons/Medium.png",
+                                  twitch: "/images/social_icons/Twitch.png",
+                                  other: "/images/social_icons/others.png"
+                                };
+                                return categoryMap[category] || "/images/social_icons/others.png";
+                              })();
+                              return (
+                                <button
+                                  type="button"
+                                  key={category}
+                                  className={`px-3 py-1.5 rounded-md border text-xs capitalize flex items-center gap-1.5 ${
+                                    active 
+                                      ? "bg-primary text-primary-foreground border-primary" 
+                                      : "bg-muted text-foreground hover:bg-muted/80"
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedCategories(prev => 
+                                      prev.includes(category) 
+                                        ? prev.filter(x => x !== category) 
+                                        : [...prev, category]
+                                    );
+                                  }}
+                                  data-testid={`category-${category}`}
+                                >
+                                  <img 
+                                    src={categoryData} 
+                                    alt={category}
+                                    className="h-3.5 w-3.5 object-contain"
+                                  />
+                                  {category}
+                                </button>
+                              );
+                            })}
+                            {/* Plus button to open more categories modal */}
+                            <button
+                              type="button"
+                              className="px-3 py-1.5 rounded-md border text-xs flex items-center gap-1.5 bg-muted text-foreground hover:bg-muted/80 relative"
+                              onClick={() => setIsMoreCategoriesModalOpen(true)}
+                              data-testid="button-more-categories"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              More
+                              {(() => {
+                                const moreCategories = ["yahoo", "X", "linkedin", "instagram", "figma", "dribbble", "discord", "reddit", "spotify", "youtube", "tiktok", "snapchat", "whatsapp", "telegram", "pinterest", "medium", "twitch", "other"];
+                                const selectedMoreCategories = selectedCategories.filter(cat => moreCategories.includes(cat));
+                                if (selectedMoreCategories.length > 0) {
+                                  return (
+                                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] h-4 min-w-4 px-1">
+                                      {selectedMoreCategories.length}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </button>
+                          </div>
+                        </div>
+
                         <DialogFooter className="pt-2">
                           <div className="flex w-full justify-between">
                             <Button
@@ -932,6 +1096,15 @@ export default function Dashboard() {
                                 setHasDescriptionOnly(false);
                                 setDomainInput("");
                                 setStarredOnly(false);
+                                setSelectedCategories([]);
+                                setSearchQuery("");
+                                setSortBy("newest");
+                                // Clear sessionStorage
+                                try {
+                                  sessionStorage.removeItem('lockify-filter-settings');
+                                } catch (e) {
+                                  console.error('Failed to clear filter settings:', e);
+                                }
                               }}
                             >
                               Clear all
@@ -964,7 +1137,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex gap-2">
                       
-                      <Button variant="outline" size="icon" onClick={() => setHistoryEvents(history.list())} className="sm:hidden" title="Refresh">
+                      <Button variant="outline" size="icon" onClick={() => setHistoryEvents(history.list())} className="sm:hidden size-8" title="Refresh">
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                       <Button variant="outline" onClick={() => setHistoryEvents(history.list())} className="hidden sm:inline-flex">Refresh</Button>
@@ -1150,6 +1323,78 @@ export default function Dashboard() {
         isOpen={isPasswordGeneratorOpen}
         onClose={() => setIsPasswordGeneratorOpen(false)}
       />
+
+      {/* More Categories Modal */}
+      <Dialog open={isMoreCategoriesModalOpen} onOpenChange={setIsMoreCategoriesModalOpen}>
+        <DialogContent className="sm:max-w-[540px] px-4 py-4 sm:px-6 sm:py-6">
+          <DialogHeader>
+            <DialogTitle>All Categories</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 max-h-[400px] overflow-y-auto">
+              {["yahoo", "X", "linkedin", "instagram", "figma", "dribbble", "discord", "reddit", "spotify", "youtube", "tiktok", "snapchat", "whatsapp", "telegram", "pinterest", "medium", "twitch", "other"].map((category) => {
+                const active = selectedCategories.includes(category);
+                const categoryData = (() => {
+                  const categoryMap: Record<string, string> = {
+                    gmail: "/images/social_icons/Google.png",
+                    outlook: "/images/social_icons/Outlook.png",
+                    yahoo: "/images/social_icons/others.png",
+                    github: "/images/social_icons/Github.png",
+                    facebook: "/images/social_icons/Facebook.png",
+                    X: "/images/social_icons/X.png",
+                    linkedin: "/images/social_icons/Linkedin.png",
+                    instagram: "/images/social_icons/Instagram.png",
+                    figma: "/images/social_icons/Figma.png",
+                    dribbble: "/images/social_icons/Dribbble.png",
+                    discord: "/images/social_icons/Discord.png",
+                    reddit: "/images/social_icons/Reddit.png",
+                    spotify: "/images/social_icons/Spotify.png",
+                    youtube: "/images/social_icons/YouTube.png",
+                    tiktok: "/images/social_icons/TikTok.png",
+                    snapchat: "/images/social_icons/Snapchat.png",
+                    whatsapp: "/images/social_icons/WhatsApp.png",
+                    telegram: "/images/social_icons/Telegram.png",
+                    pinterest: "/images/social_icons/Pinterest.png",
+                    medium: "/images/social_icons/Medium.png",
+                    twitch: "/images/social_icons/Twitch.png",
+                    other: "/images/social_icons/others.png"
+                  };
+                  return categoryMap[category] || "/images/social_icons/others.png";
+                })();
+                return (
+                  <button
+                    type="button"
+                    key={category}
+                    className={`px-3 py-1.5 rounded-md border text-xs capitalize flex items-center gap-1.5 ${
+                      active 
+                        ? "bg-primary text-primary-foreground border-primary" 
+                        : "bg-muted text-foreground hover:bg-muted/80"
+                    }`}
+                    onClick={() => {
+                      setSelectedCategories(prev => 
+                        prev.includes(category) 
+                          ? prev.filter(x => x !== category) 
+                          : [...prev, category]
+                      );
+                    }}
+                    data-testid={`more-category-${category}`}
+                  >
+                    <img 
+                      src={categoryData} 
+                      alt={category}
+                      className="h-3.5 w-3.5 object-contain"
+                    />
+                    {category}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsMoreCategoriesModalOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

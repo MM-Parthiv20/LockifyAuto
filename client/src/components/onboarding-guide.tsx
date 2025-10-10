@@ -12,8 +12,8 @@ interface OnboardingGuideProps {
 
 const onboardingSteps = [
   {
-    title: "Welcome to Lumora",
-    description: "Your secure password manager.",
+    title: "Welcome to Lockify",
+    description: "Secure password management with industry-standard encryption.",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -27,25 +27,25 @@ const onboardingSteps = [
         <path d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
       </svg>
     ),
-    content: "Keep your passwords safe with encryption protected by your master password.",
+    content: "All passwords are encrypted using advanced algorithms and protected by your master password.",
   },
   {
     title: "Add Your First Password",
-    description: "Store your credentials securely.",
+    description: "Store credentials securely with the 'Add New Record' button.",
     icon: Plus,
-    content: "Click 'Add New Record' to store email, password, and description.",
+    content: "Each record includes email/username, encrypted password, optional description, and star marking.",
   },
   {
-    title: "Use the Password Generator",
-    description: "Generate strong passwords instantly.",
+    title: "Password Generator",
+    description: "Generate strong, unique passwords meeting modern security standards.",
     icon: Key,
-    content: "Create unique passwords with customizable length and character types.",
+    content: "Customize length and character types: uppercase, lowercase, numbers, and symbols.",
   },
   {
-    title: "Search and Organize",
-    description: "Find your passwords quickly.",
+    title: "Search and Organization",
+    description: "Quickly locate credentials with powerful search and filtering.",
     icon: Search,
-    content: "Use the search bar to find records by email or description.",
+    content: "Find records by email, description, or service type with advanced filters.",
   },
 ];
 
@@ -75,7 +75,7 @@ export function OnboardingGuide({ isOpen, onComplete }: OnboardingGuideProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onComplete(); }}>
-      <DialogContent className="sm:max-w-lg" data-testid="modal-onboarding" aria-describedby="onboarding-description">
+      <DialogContent className="sm:max-w-2xl" data-testid="modal-onboarding" aria-describedby="onboarding-description">
         <DialogHeader className="text-center space-y-4">
           <div className="bg-primary rounded-lg p-3 w-fit mx-auto">
             {typeof Icon === 'object' ? Icon : <Icon className="w-8 h-8 text-primary-foreground" />}
