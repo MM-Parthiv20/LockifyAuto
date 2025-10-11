@@ -17,9 +17,74 @@ interface RecordModalProps {
   onClose: () => void;
   mode: "add" | "edit";
   record?: PasswordRecord | null;
+  onCreateSuccess?: () => void;
 }
 
-export function RecordModal({ isOpen, onClose, mode, record }: RecordModalProps) {
+// Category options with custom image icons
+export const categoryOptions = [
+  { value: "gmail", label: "Gmail", imagePath: "/images/social_icons/Google.png" },
+  { value: "outlook", label: "Outlook", imagePath: "/images/social_icons/Outlook.png" },
+  { value: "yahoo", label: "Yahoo", imagePath: "/images/social_icons/others.png" },
+  { value: "protonmail", label: "ProtonMail", imagePath: "/images/social_icons/others.png" },
+  { value: "instagram", label: "Instagram", imagePath: "/images/social_icons/Instagram.png" },
+  { value: "facebook", label: "Facebook", imagePath: "/images/social_icons/Facebook.png" },
+  { value: "X", label: "X", imagePath: "/images/social_icons/X.png" },
+  { value: "linkedin", label: "LinkedIn", imagePath: "/images/social_icons/Linkedin.png" },
+  { value: "github", label: "GitHub", imagePath: "/images/social_icons/Github.png" },
+  { value: "figma", label: "Figma", imagePath: "/images/social_icons/Figma.png" },
+  { value: "dribbble", label: "Dribbble", imagePath: "/images/social_icons/Dribbble.png" },
+  { value: "apple", label: "Apple", imagePath: "/images/social_icons/Apple.png" },
+  { value: "amazon", label: "Amazon", imagePath: "/images/social_icons/Amazon.png" },
+  { value: "discord", label: "Discord", imagePath: "/images/social_icons/Discord.png" },
+  { value: "reddit", label: "Reddit", imagePath: "/images/social_icons/Reddit.png" },
+  { value: "spotify", label: "Spotify", imagePath: "/images/social_icons/Spotify.png" },
+  { value: "youtube", label: "YouTube", imagePath: "/images/social_icons/YouTube.png" },
+  { value: "tiktok", label: "TikTok", imagePath: "/images/social_icons/TikTok.png" },
+  { value: "snapchat", label: "Snapchat", imagePath: "/images/social_icons/Snapchat.png" },
+  { value: "whatsapp", label: "WhatsApp", imagePath: "/images/social_icons/WhatsApp.png" },
+  { value: "telegram", label: "Telegram", imagePath: "/images/social_icons/Telegram.png" },
+  { value: "pinterest", label: "Pinterest", imagePath: "/images/social_icons/Pinterest.png" },
+  { value: "medium", label: "Medium", imagePath: "/images/social_icons/Medium.png" },
+  { value: "twitch", label: "Twitch", imagePath: "/images/social_icons/Twitch.png" },
+  { value: "other", label: "Other", imagePath: "/images/social_icons/others.png" },
+];
+
+// Social media platforms that don't require email format
+export const socialMediaPlatforms = ['instagram', 'facebook', 'X', 'linkedin', 'github', 'figma', 'dribbble', 'discord', 'reddit', 'spotify', 'youtube', 'tiktok', 'snapchat', 'whatsapp', 'telegram', 'pinterest', 'medium', 'twitch'];
+
+export const isSocialMedia = (userType?: string | null) => {
+  return userType ? socialMediaPlatforms.includes(userType) : false;
+};
+
+export const getCategoryIcon = (userType?: string | null) => {
+  const category = categoryOptions.find(c => c.value === userType);
+  if (!category) return null;
+  return (
+    <img 
+      src={category.imagePath} 
+      alt={category.label}
+      className="h-5 w-5 object-contain"
+      loading="lazy"
+      onError={(e) => {
+        // Fallback to others.png if specific image fails to load
+        const target = e.target as HTMLImageElement;
+        if (target.src !== "/images/social_icons/others.png") {
+          target.src = "/images/social_icons/others.png";
+        } else {
+          // If even the fallback fails, hide the image
+          target.style.display = 'none';
+        }
+      }}
+    />
+  );
+};
+
+export const getCategoryLabel = (userType?: string | null) => {
+  const category = categoryOptions.find(c => c.value === userType);
+  return category?.label || "Select category";
+};
+
+export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: RecordModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
   const [formData, setFormData] = useState({
