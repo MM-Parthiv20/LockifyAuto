@@ -627,10 +627,10 @@ export default function Dashboard() {
           <div className="mb-4">
               
               {/* floating Add record and password generator */}
-              <div className="floating-button-group fixed bottom-4 right-4 xl:hidden flex flex-col gap-3 items-end">
+              <div className="floating-button-group fixed bottom-4 right-4 xl:right-[13%] flex flex-col gap-3 items-end">
                 <Button
                   onClick={() => setIsPasswordGeneratorOpen(true)}
-                  className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#A889B3] text-black shadow-[0_10px_20px_rgba(0,0,0,0.35)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.45)] transition-transform duration-200 active:translate-y-0.5"
+                  className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-[#A889B3] text-black shadow-[0_10px_20px_rgba(0,0,0,0.35)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.45)] transition-transform duration-200 active:translate-y-0.5"
                   size="icon"
                   data-testid="button-password-generator"
                 >
@@ -638,7 +638,7 @@ export default function Dashboard() {
                 </Button>
                 <Button
                   onClick={() => handleAddRecord()}
-                  className="flex items-center justify-center sm:w-20 sm:h-20 w-16 h-16 xl:rounded-3xl rounded-2xl bg-[#8AA0D8] text-black shadow-[0_14px_28px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform duration-200 active:translate-y-0.5"
+                  className="flex items-center justify-center sm:w-20 sm:h-20 w-16 h-16 rounded-2xl bg-[#8AA0D8] text-black shadow-[0_14px_28px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform duration-200 active:translate-y-0.5"
                   data-testid="button-add-record"
                 >
                   <Plus className="w-9 h-9" />
