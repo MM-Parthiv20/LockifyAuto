@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from './queryClient';
 import { history } from './history';
+import { VibrateIfEnabled } from './vibration';
 
 interface User {
   id: string;
@@ -116,6 +117,8 @@ export function useAuth() {
     },
     onSuccess: (user) => {
       setLoggedIn(user);
+      // ✅ Vibration feedback on successful login
+      VibrateIfEnabled.short();
       // Fire-and-forget history logging
       void history.add({ type: 'login', summary: `Logged in as ${user.username}` }).catch(() => {});
     },

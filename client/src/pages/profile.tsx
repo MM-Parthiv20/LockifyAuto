@@ -2,16 +2,18 @@ import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { PasswordRecord } from "@shared/schema";
-import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX, Play, Key, Moon, Sun, User, Info } from "lucide-react";
+import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX, Play, Key, Moon, Sun, User, Info, Vibrate } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import AvatarPickerDialog from "@/components/avatar-picker-dialog";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { useTheme } from "@/components/theme-provider";
+import { VibrationPreference, Vibration } from "@/lib/vibration";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
@@ -24,6 +26,7 @@ export default function Profile() {
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [vibrationEnabled, setVibrationEnabled] = useState(() => VibrationPreference.isEnabled());
 
   const stats = useMemo(() => ({
     total: (records as any[]).filter((r) => !r.isDeleted).length,
@@ -160,6 +163,39 @@ export default function Profile() {
                 <div className="flex py-3 gap-2 text-sm justify-between border-b border-border">
                   <div className="text-muted-foreground">Total Records</div>
                   <div className="font-medium">{stats.total}</div>
+                </div>
+
+                {/* Preferences Section */}
+                <div className="mt-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Preferences</h3>
+                  
+                  {/* Vibration Toggle */}
+                  <div className="flex items-center justify-between py-2 px-3 rounded-md border border-border bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <Vibrate className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">Haptic Feedback</div>
+                        <div className="text-xs text-muted-foreground">
+                          Vibrate on actions
+                        </div>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={vibrationEnabled}
+                      onCheckedChange={(checked) => {
+                        setVibrationEnabled(checked);
+                        VibrationPreference.setEnabled(checked);
+                        if (checked) {
+                          Vibration.short(); // Test vibration
+                        }
+                        toast({
+                          title: checked ? "Vibration enabled" : "Vibration disabled",
+                          description: checked ? "You'll feel haptic feedback on actions" : "Haptic feedback is now disabled",
+                        });
+                      }}
+                      data-testid="switch-vibration"
+                    />
+                  </div>
                 </div>
 
                 {/* Complete Onboarding Button - only show if incomplete */}

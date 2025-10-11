@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PasswordRecord } from "@shared/schema";
 import { Copy, Edit, Trash2, Eye, EyeOff, Info, Star } from "lucide-react";
 import { getCategoryIcon, getCategoryLabel, isSocialMedia } from "@/components/record-modal";
+import { VibrateIfEnabled } from "@/lib/vibration";
 
 interface PasswordRecordCardProps {
   record: PasswordRecord;
@@ -35,6 +36,8 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
+      // ✅ Vibration feedback on successful copy
+      VibrateIfEnabled.short();
       toast({ title: "Copied to clipboard", description: `${fieldName} has been copied to your clipboard` });
     } catch (error) {
       try {
@@ -49,8 +52,12 @@ export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: P
         document.execCommand("copy");
         selection?.removeAllRanges();
         document.body.removeChild(node);
+        // ✅ Vibration feedback on successful copy
+        VibrateIfEnabled.short();
         toast({ title: "Copied to clipboard", description: `${fieldName} has been copied to your clipboard` });
       } catch {
+        // ❌ Error vibration on failure
+        VibrateIfEnabled.error();
         toast({ title: "Copy failed", description: "Failed to copy to clipboard", variant: "destructive" });
       }
     }

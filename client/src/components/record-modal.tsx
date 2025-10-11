@@ -13,6 +13,7 @@ import { validatePassword } from "@/lib/password-validation";
 import { PasswordGenerator } from "@/components/password-generator";
 import { Eye, EyeOff, Check, X, Key } from "lucide-react";
 import { history } from "@/lib/history";
+import { VibrateIfEnabled } from "@/lib/vibration";
 
 interface RecordModalProps {
   isOpen: boolean;
@@ -132,6 +133,8 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
       // Update cache locally to avoid an extra refetch
       const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
       queryClient.setQueryData(["/api/records"], [created, ...current]);
+      // ✅ Vibration feedback on successful creation
+      VibrateIfEnabled.short();
       toast({
         title: "Record created",
         description: "Your password record has been saved successfully",

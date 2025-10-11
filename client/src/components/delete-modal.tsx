@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { PasswordRecord } from "@shared/schema";
 import { AlertTriangle } from "lucide-react";
 import { history } from "@/lib/history";
+import { VibrateIfEnabled } from "@/lib/vibration";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ export function DeleteModal({ isOpen, onClose, record }: DeleteModalProps) {
       const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
       const next = current.map((r) => (r.id === updated.id ? updated : r));
       queryClient.setQueryData(["/api/records"], next);
+      // ✅ Vibration feedback on delete
+      VibrateIfEnabled.short();
       toast({
         title: "Moved to Trash",
       });
