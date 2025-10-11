@@ -4,6 +4,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import NotFound from "@/pages/not-found";
 import Profile from "@/pages/profile";
+import About from "@/pages/about";
 import { queryClient } from "@/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Route, Switch } from "wouter";
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/register" component={Register} />
           <Route path="/history" component={Dashboard} />
           <Route path="/profile" component={Profile} />
+          <Route path="/about" component={About} />
           <Route>{() => <NotFound />}</Route>
         </Switch>
         <Toaster />

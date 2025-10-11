@@ -116,9 +116,8 @@ export function useAuth() {
     },
     onSuccess: (user) => {
       setLoggedIn(user);
-      try {
-        history.add({ type: 'login', summary: `Logged in as ${user.username}` });
-      } catch {}
+      // Fire-and-forget history logging
+      void history.add({ type: 'login', summary: `Logged in as ${user.username}` }).catch(() => {});
     },
   });
 
@@ -140,9 +139,8 @@ export function useAuth() {
     },
     onSuccess: (user) => {
       setLoggedIn(user);
-      try {
-        history.add({ type: 'register', summary: `Registered new user ${user.username}` });
-      } catch {}
+      // Fire-and-forget history logging
+      void history.add({ type: 'register', summary: `Registered new user ${user.username}` }).catch(() => {});
     },
   });
 
@@ -154,9 +152,8 @@ export function useAuth() {
     try {
       window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
     } catch {}
-    try {
-      history.add({ type: 'logout', summary: 'Logged out' });
-    } catch {}
+    // Fire-and-forget history logging
+    void history.add({ type: 'logout', summary: 'Logged out' }).catch(() => {});
   };
 
   const updateOnboardingStatus = useMutation({

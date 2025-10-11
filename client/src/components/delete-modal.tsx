@@ -32,9 +32,8 @@ export function DeleteModal({ isOpen, onClose, record }: DeleteModalProps) {
       toast({
         title: "Moved to Trash",
       });
-      try {
-        history.add({ type: "record:delete", summary: `Moved to Trash: ${record?.email}`, details: { id: record?.id } });
-      } catch {}
+      // Fire-and-forget history logging
+      void history.add({ type: "record:delete", summary: `Moved to Trash: ${record?.email}`, details: { id: record?.id } }).catch(() => {});
       onClose();
     },
     onError: (error: any) => {

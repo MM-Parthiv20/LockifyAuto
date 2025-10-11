@@ -25,7 +25,7 @@ import LoadingSpinner from "@/components/loading-spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { history } from "@/lib/history";
+import { history, HistoryEvent } from "@/lib/history";
 
 type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 
@@ -118,9 +118,8 @@ export default function Dashboard() {
     },
     onSettled: () => {
       // Do not refetch; cache already updated optimistically
-      try {
-        history.add({ type: "record: toggleStar", summary: "Toggled star on a record" });
-      } catch {}
+      // Fire-and-forget history logging
+      void history.add({ type: "record: toggleStar", summary: "Toggled star on a record" }).catch(() => {});
     },
   });
 
@@ -132,19 +131,36 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   // History page state (for /history)
-  const [historyEvents, setHistoryEvents] = useState(() => history.list());
+  const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
   const [historyFilter, setHistoryFilter] = useState("");
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  
+  const loadHistoryEvents = async () => {
+    try {
+      setIsHistoryLoading(true);
+      const events = await history.list();
+      setHistoryEvents(events);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+  
   useEffect(() => {
-    const refresh = () => setHistoryEvents(history.list());
+    loadHistoryEvents();
+    
+    const refresh = () => {
+      loadHistoryEvents();
+    };
     window.addEventListener('lockify-history-updated' as any, refresh as any);
-    // Force initial fetch from API so data shows immediately
-    history.refresh().catch(() => {});
     return () => window.removeEventListener('lockify-history-updated' as any, refresh as any);
   }, []);
+  
   const filteredHistory = (() => {
     const q = historyFilter.trim().toLowerCase();
     if (!q) return historyEvents;
-    return historyEvents.filter(e => e.summary.toLowerCase().includes(q) || e.type.toLowerCase().includes(q));
+    return historyEvents.filter((e: HistoryEvent) => e.summary.toLowerCase().includes(q) || e.type.toLowerCase().includes(q));
   })();
   const formatHistoryTime = (ts: number) => new Date(ts).toLocaleString();
 
@@ -188,9 +204,8 @@ export default function Dashboard() {
       if (deletedCount > 0) {
         queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
         toast({ title: "Auto-removed old items", description: `${deletedCount} item(s) older than 30 days were deleted.` });
-        try {
-          history.add({ type: "trash: autoDelete", summary: `Auto-deleted ${deletedCount} item(s) from Trash` });
-        } catch {}
+        // Fire-and-forget history logging
+        void history.add({ type: "trash: autoDelete", summary: `Auto-deleted ${deletedCount} item(s) from Trash` }).catch(() => {});
       }
     })();
   }, [isTrashView, trashedRecords]);
@@ -273,16 +288,16 @@ export default function Dashboard() {
             position: "bottom"
           },
           { 
-            element: "#tour-password-generator", 
+            element: window.innerWidth >= 1280 ? "#tour-password-generator" : "#tour-password-generator-mobile", 
             title: "Password Generator",
             intro: "Generate secure passwords with customizable length (8-128) and character types.",
-            position: "left"
+            position: window.innerWidth >= 1280 ? "left" : "left"
           },
           { 
-            element: "#tour-add-record", 
+            element: window.innerWidth >= 1280 ? "#tour-add-record" : "#tour-add-record-mobile", 
             title: "Add Password",
             intro: "Store encrypted passwords with email, description, and star marking.",
-            position: "left"
+            position: window.innerWidth >= 1280 ? "left" : "left"
           },
         ],
       });
@@ -516,7 +531,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       {/* Navigation Header */}
       <nav className="bg-card border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -608,107 +623,8 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div>
+        {!isTrashView && !isHistoryView && (  
           <div className="mb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-2 w-full">
-                {(isTrashView || isHistoryView) && (
-                  <ArrowLeft
-                    className="w-8 h-8 rounded-md bg-primary/10 p-1 cursor-pointer"
-                    onClick={() => {
-                      // Navigate back to main dashboard without full reload
-                      setLocation("/");
-                    }}
-                    data-testid="button-back-from-trash"
-                  />
-                )}
-                <div>
-                  <h2 className="text-xl sm:text-3xl font-bold text-foreground">
-                    {isTrashView ? "Trash" : isHistoryView ? "Activity History" : "Your Passwords"}
-                  </h2>
-                  <p className="text-muted-foreground text-sm sm:text-base">
-                      {isTrashView || isHistoryView ? "" : "Manage your email and password records securely"}
-                    </p>
-                 
-                  </div>
-                  {isTrashView && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="p-2 ms-auto" aria-label="More actions">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled={trashedRecords.length === 0} onClick={async () => {
-                          const count = trashedRecords.length;
-                          try {
-                            for (const r of trashedRecords) {
-                              await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
-                            }
-                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
-                            toast({ title: "Restored items", description: `${count} item(s) restored from Trash.` });
-                            try {
-                              history.add({ type: "record: restore", summary: `Restored ${count} item(s) from Trash` });
-                            } catch {}
-                          } catch (e: any) {
-                            toast({ title: "Restore failed", description: e?.message || "Could not restore all items.", variant: "destructive" });
-                          }
-                        }} data-testid="menu-restore-all">
-                          <RefreshCcw className="w-4 h-4 mr-2" /> Restore All
-                        </DropdownMenuItem>
-                        <DropdownMenuItem disabled={trashedRecords.length === 0} onClick={async () => {
-                          const count = trashedRecords.length;
-                          try {
-                            for (const r of trashedRecords) {
-                              await apiRequest("DELETE", `/api/records/${r.id}`);
-                            }
-                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
-                            toast({ title: "Trash emptied", description: `${count} item(s) permanently deleted.` });
-                            try {
-                              history.add({ type: "trash: empty", summary: `Emptied Trash: ${count} item(s)` });
-                            } catch {}
-                          } catch (e: any) {
-                            toast({ title: "Empty Trash failed", description: e?.message || "Could not delete all items.", variant: "destructive" });
-                          }
-                        }} data-testid="menu-empty-trash">
-                          <Trash2 className="w-4 h-4 mr-2" /> Empty Trash
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-                
-                {/* Action Buttons */}
-                {isTrashView || isHistoryView ? "" : (
-                    <>
-                <div className="mobile-button-group flex flex-row gap-2 hidden xl:flex">
-              
-                      <Button 
-                        id="tour-password-generator"
-                        onClick={() => setIsPasswordGeneratorOpen(true)}
-                        variant="outline"
-                        className="btn flex items-center justify-center"
-                        data-testid="button-password-generator"
-                      >
-                        <Key className="w-4 h-4 sm:w-5 sm:h-5" />
-                        <span className="text-sm sm:text-base">
-                          <span className="hidden sm:inline">Password Generator</span>
-                          <span className="sm:hidden">Generate</span>
-                        </span>
-                      </Button>
-                      <Button 
-                        id="tour-add-record"
-                        onClick={handleAddRecord}
-                        className="btn flex items-center justify-center"
-                        data-testid="button-add-record"
-                      >
-                        <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                        <span className="text-sm sm:text-base">Add Record</span>
-                      </Button>
-                 
-                </div>
-                   </>
-                  )}
-              </div>
               
               {/* floating Add record and password generator */}
               <div className="floating-button-group fixed bottom-4 right-4 xl:hidden flex flex-col gap-3 items-end">
@@ -734,8 +650,8 @@ export default function Dashboard() {
               
               
               {/* Search, Sort and Filters */}
-              {!isTrashView && !isHistoryView && (
-              <div className="search-sort-container mt-4 sm:mt-6 flex flex-row gap-2">
+              
+              <div className="search-sort-container flex flex-row gap-2">
                 <div className="flex-1 relative" id="tour-search">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                   <Input
@@ -1117,8 +1033,8 @@ export default function Dashboard() {
                   </Dialog>
                 </div>
               </div>
-              )}
             </div>
+            )}
   
             {/* Main Content */}
             <div className="space-y-4">
@@ -1137,14 +1053,14 @@ export default function Dashboard() {
                     </div>
                     <div className="flex gap-2">
                       
-                      <Button variant="outline" size="icon" onClick={() => setHistoryEvents(history.list())} className="sm:hidden size-8" title="Refresh">
+                      <Button variant="outline" size="icon" onClick={() => loadHistoryEvents()} className="sm:hidden size-8" title="Refresh">
                         <RefreshCw className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" onClick={() => setHistoryEvents(history.list())} className="hidden sm:inline-flex">Refresh</Button>
-                      <Button variant="destructive" size="icon" disabled={historyEvents.length === 0} onClick={() => { history.clear(); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="sm:hidden" title="Clear All">
+                      <Button variant="outline" onClick={() => loadHistoryEvents()} className="hidden sm:inline-flex">Refresh</Button>
+                      <Button variant="destructive" size="icon" disabled={historyEvents.length === 0} onClick={async () => { await history.clear(); setHistoryEvents([]); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="sm:hidden" title="Clear All">
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                      <Button variant="destructive" disabled={historyEvents.length === 0} onClick={() => { history.clear(); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="hidden sm:inline-flex">Clear All</Button>
+                      <Button variant="destructive" disabled={historyEvents.length === 0} onClick={async () => { await history.clear(); setHistoryEvents([]); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="hidden sm:inline-flex">Clear All</Button>
                     </div>
                   </div>
                   {filteredHistory.length === 0 ? (
@@ -1162,10 +1078,20 @@ export default function Dashboard() {
                   )}
                 </>
               ) : isTrashView ? (
-                trashedRecords.length === 0 ? (
-                  <div className="text-center py-16 text-muted-foreground">No items in Trash</div>
-                ) : (
-                  trashedRecords.map((r) => (
+                <>
+                    <div className="mb-4 flex items-center gap-2">
+                      <ArrowLeft
+                        className="w-8 h-8 rounded-md bg-primary/10 p-1 cursor-pointer"
+                        onClick={() => setLocation("/profile")}
+                      />
+                      <div>
+                        <h2 className="text-xl sm:text-3xl font-bold text-foreground">Trash</h2>
+                      </div>
+                    </div>
+                  {trashedRecords.length === 0 ? (
+                    <div className="text-center py-16 text-muted-foreground">No items in Trash</div>
+                  ) : (
+                    trashedRecords.map((r) => (
                     <div key={r.id} className="border rounded-md p-3 flex items-center justify-between">
                       <div className="min-w-0">
                         <div className="font-medium truncate flex items-center gap-2">
@@ -1199,9 +1125,8 @@ export default function Dashboard() {
                           onClick={async () => {
                             await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
-                            try {
-                              history.add({ type: "record: restore", summary: `Restored: ${r.email}`, details: { id: r.id } });
-                            } catch {}
+                            // Log history (no need to await)
+                            void history.add({ type: "record: restore", summary: `Restored: ${r.email}`, details: { id: r.id } }).catch(() => {});
                           }}
                         >
                           <RefreshCcw className="w-4 h-4" />
@@ -1214,9 +1139,8 @@ export default function Dashboard() {
                           onClick={async () => {
                             await apiRequest("DELETE", `/api/records/${r.id}`);
                             queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
-                            try {
-                              history.add({ type: "record: delete", summary: `Permanently deleted: ${r.email}`, details: { id: r.id } });
-                            } catch {}
+                            // Log history (no need to await)
+                            void history.add({ type: "record: delete", summary: `Permanently deleted: ${r.email}`, details: { id: r.id } }).catch(() => {});
                           }}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1224,7 +1148,8 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))
-                )
+                  )}
+                </>
               ) : (
                 filteredAndSortedRecords.length === 0 ? (
                   <div className="text-center py-16">

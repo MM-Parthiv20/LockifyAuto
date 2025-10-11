@@ -136,9 +136,8 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
         title: "Record created",
         description: "Your password record has been saved successfully",
       });
-      try {
-        history.add({ type: "record: create", summary: `Created record for ${formData.email}`, details: { email: formData.email } });
-      } catch {}
+      // Fire-and-forget history logging
+      void history.add({ type: "record: create", summary: `Created record for ${formData.email}`, details: { email: formData.email } }).catch(() => {});
       if (onCreateSuccess) {
         try {
           onCreateSuccess();
@@ -172,9 +171,8 @@ export function RecordModal({ isOpen, onClose, mode, record, onCreateSuccess }: 
         title: "Record updated",
         description: "Your password record has been updated successfully",
       });
-      try {
-        history.add({ type: "record: update", summary: `Updated record ${record?.email || formData.email}`, details: { id: record?.id } });
-      } catch {}
+      // Fire-and-forget history logging
+      void history.add({ type: "record: update", summary: `Updated record ${record?.email || formData.email}`, details: { id: record?.id } }).catch(() => {});
       onClose();
     },
     onError: (error: any) => {
