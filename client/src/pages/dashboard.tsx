@@ -252,10 +252,12 @@ export default function Dashboard() {
         doneLabel: "Get Started!",
         // Position and appearance
         tooltipPosition: "auto",
-        positionPrecedence: ["bottom", "top", "right", "left"],
+        positionPrecedence: ["bottom", "top", "left", "right"],
         scrollToElement: true,
         scrollPadding: 30,
         overlayOpacity: 0.8,
+        helperElementPadding: 10,
+        showStepNumbers: false,
         // Steps with detailed content
         tooltipClass: "intro-tooltip-wide",
         steps: [
@@ -288,16 +290,16 @@ export default function Dashboard() {
             position: "bottom"
           },
           { 
-            element: window.innerWidth >= 1280 ? "#tour-password-generator" : "#tour-password-generator-mobile", 
+            element: "#tour-password-generator-mobile", 
             title: "Password Generator",
             intro: "Generate secure passwords with customizable length (8-128) and character types.",
-            position: window.innerWidth >= 1280 ? "left" : "left"
+            position: "left"
           },
           { 
-            element: window.innerWidth >= 1280 ? "#tour-add-record" : "#tour-add-record-mobile", 
+            element: "#tour-add-record-mobile", 
             title: "Add Password",
             intro: "Store encrypted passwords with email, description, and star marking.",
-            position: window.innerWidth >= 1280 ? "left" : "left"
+            position: "left"
           },
         ],
       });
@@ -629,6 +631,7 @@ export default function Dashboard() {
               {/* floating Add record and password generator */}
               <div className="floating-button-group fixed bottom-4 right-4 xl:right-[13%] flex flex-col gap-3 items-end">
                 <Button
+                  id="tour-password-generator-mobile"
                   onClick={() => setIsPasswordGeneratorOpen(true)}
                   className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-[#A889B3] text-black shadow-[0_10px_20px_rgba(0,0,0,0.35)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.45)] transition-transform duration-200 active:translate-y-0.5"
                   size="icon"
@@ -637,6 +640,7 @@ export default function Dashboard() {
                   <Key className="w-6 h-6" />
                 </Button>
                 <Button
+                  id="tour-add-record-mobile"
                   onClick={() => handleAddRecord()}
                   className="flex items-center justify-center sm:w-20 sm:h-20 w-16 h-16 rounded-2xl bg-[#8AA0D8] text-black shadow-[0_14px_28px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform duration-200 active:translate-y-0.5"
                   data-testid="button-add-record"

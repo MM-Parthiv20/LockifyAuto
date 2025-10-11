@@ -202,6 +202,8 @@
 .introjs-helperLayer {
   border-radius: var(--radius) !important;
   box-shadow: 0 0 1px 2px var(--ring), 0 0 0 9999px rgb(0 0 0 / 60%) !important;
+  z-index: 9999999 !important;
+  position: absolute !important;
 }
 
 .introjs-tooltip {
@@ -294,6 +296,62 @@
     min-width: 280px !important;
     max-width: 320px !important;
   }
+}
+
+/* Fix Intro.js arrows to ensure they point correctly */
+.introjs-arrow {
+  border: 10px solid transparent !important;
+}
+
+/* Arrow pointing to the top */
+.introjs-arrow.top {
+  border-bottom-color: var(--card) !important;
+  top: -20px !important;
+}
+
+/* Arrow pointing to the right */
+.introjs-arrow.right {
+  border-left-color: var(--card) !important;
+  right: -20px !important;
+}
+
+/* Arrow pointing to the bottom */
+.introjs-arrow.bottom {
+  border-top-color: var(--card) !important;
+  bottom: -20px !important;
+}
+
+/* Arrow pointing to the left */
+.introjs-arrow.left {
+  border-right-color: var(--card) !important;
+  left: -20px !important;
+}
+
+/* Ensure tooltip reference layer has highest z-index */
+.introjs-tooltipReferenceLayer {
+  z-index: 10000000 !important;
+}
+
+/* Overlay should be below everything else */
+.introjs-overlay {
+  z-index: 9999998 !important;
+}
+
+/* Fix for floating buttons */
+.floating-button-group {
+  z-index: 40;
+}
+
+.introjs-fixedTooltip {
+  position: fixed !important;
+}
+
+/* Ensure arrows are visible */
+.introjs-arrow.top::before,
+.introjs-arrow.bottom::before,
+.introjs-arrow.left::before,
+.introjs-arrow.right::before {
+  display: none !important;
 }
 
 
