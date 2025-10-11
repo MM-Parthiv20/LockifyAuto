@@ -1,108 +1,196 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from './queryClient';
+import { history } from './history';
 
 interface User {
   id: string;
   username: string;
   hasCompletedOnboarding?: boolean;
+  profileimage?: string;
 }
 
-interface AuthResponse {
-  user: User;
-  token: string;
-}
-
-const TOKEN_KEY = 'lockify-token';
+const AUTH_KEY = 'lockify-auth';
+const SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const DEFAULT_CREDENTIALS = { username: 'parthiv21', password: 'Parthiv2011!' };
+const AVATAR_CACHE_PREFIX = 'lockify-avatar-';
 
 export function useAuth() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
+  const [auth, setAuth] = useState<{ user: User; expiresAt?: number } | null>(() => {
+    try {
+      const raw = localStorage.getItem(AUTH_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed) return null;
+      // Expire old sessions
+      if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+        localStorage.removeItem(AUTH_KEY);
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  });
   const queryClient = useQueryClient();
 
-  const { data: user, isLoading } = useQuery({
-    queryKey: ['/api/auth/me'],
-    enabled: !!token,
-    retry: false,
-    queryFn: async () => {
-      const res = await fetch('/api/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) {
-        setToken(null);
-        localStorage.removeItem(TOKEN_KEY);
-        throw new Error('Authentication failed');
-      }
-      return res.json();
-    },
-  });
+  const setLoggedIn = (user: User, options?: { preserveExpiry?: boolean }) => {
+    const currentExpiresAt = auth?.expiresAt;
+    const expiresAt = options?.preserveExpiry && currentExpiresAt
+      ? currentExpiresAt
+      : Date.now() + SESSION_DURATION_MS;
+    // Default onboarding status: demo user -> completed; others -> not completed
+    const defaultOnboarding = user.id === 'default' ? true : false;
+    const value = { user: { ...user, hasCompletedOnboarding: user.hasCompletedOnboarding ?? defaultOnboarding }, expiresAt };
+    localStorage.setItem(AUTH_KEY, JSON.stringify(value));
+    setAuth(value);
+    // notify other hook instances in same tab
+    try {
+      window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
+    } catch {}
+  };
+
+  // keep all components in sync with localStorage changes (cross-tab and same-tab custom event)
+  // ensures navbar avatar updates immediately when profile updates
+  React.useEffect(() => {
+    const syncFromStorage = () => {
+      try {
+        const raw = localStorage.getItem(AUTH_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed?.expiresAt && Date.now() > parsed.expiresAt) {
+          localStorage.removeItem(AUTH_KEY);
+          setAuth(null);
+        } else {
+          setAuth(parsed);
+        }
+      } catch {}
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === AUTH_KEY) syncFromStorage();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('lockify-auth-updated' as any, syncFromStorage as any);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('lockify-auth-updated' as any, syncFromStorage as any);
+    };
+  }, []);
+
+  // Auto-logout timer based on expiresAt
+  React.useEffect(() => {
+    if (!auth?.expiresAt) return;
+    const remaining = auth.expiresAt - Date.now();
+    if (remaining <= 0) {
+      logout();
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      logout();
+    }, remaining);
+    return () => window.clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.expiresAt]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
-      const res = await apiRequest('POST', '/api/auth/login', credentials);
-      return res.json() as Promise<AuthResponse>;
+      // default credentials
+      if (
+        credentials.username === DEFAULT_CREDENTIALS.username &&
+        credentials.password === DEFAULT_CREDENTIALS.password
+      ) {
+        // restore cached avatar (survives logout/login for default user)
+        let cachedAvatar: string | undefined;
+        try {
+          cachedAvatar = localStorage.getItem(AVATAR_CACHE_PREFIX + credentials.username) || undefined;
+        } catch {}
+        return { id: 'default', username: credentials.username, profileimage: cachedAvatar, hasCompletedOnboarding: true } as User;
+      }
+      // Otherwise, check against MockAPI users
+      const res = await apiRequest('GET', '/api/users');
+      const users = (await res.json()) as Array<{ id: string; username: string; password: string; profileimage?: string }>;
+      const match = users.find(
+        (u) => u.username === credentials.username && u.password === credentials.password,
+      );
+      if (!match) throw new Error('Invalid credentials');
+      // For non-default users, default to not completed until they finish onboarding
+      return { id: match.id, username: match.username, profileimage: match.profileimage, hasCompletedOnboarding: false } as User;
     },
-    onSuccess: (data) => {
-      setToken(data.token);
-      localStorage.setItem(TOKEN_KEY, data.token);
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+    onSuccess: (user) => {
+      setLoggedIn(user);
+      // Fire-and-forget history logging
+      void history.add({ type: 'login', summary: `Logged in as ${user.username}` }).catch(() => {});
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string }) => {
-      const res = await apiRequest('POST', '/api/auth/register', userData);
-      return res.json() as Promise<AuthResponse>;
+      // Check if username already exists before creating
+      const existingRes = await apiRequest('GET', '/api/users');
+      const existingUsers = (await existingRes.json()) as Array<{ id: string; username: string }>;
+      const usernameTaken = existingUsers.some((u) => u.username === userData.username);
+      if (usernameTaken) {
+        throw new Error('this user already exist');
+      }
+
+      const randomId = Math.floor(Math.random() * 100) + 1;
+      const profileimage = `https://avatar.iran.liara.run/public/${randomId}`;
+      const res = await apiRequest('POST', '/api/users', { ...userData, profileimage });
+      const created = await res.json();
+      return { id: created.id as string, username: created.username as string, profileimage: created.profileimage as string, hasCompletedOnboarding: false } as User;
     },
-    onSuccess: (data) => {
-      setToken(data.token);
-      localStorage.setItem(TOKEN_KEY, data.token);
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+    onSuccess: (user) => {
+      setLoggedIn(user);
+      // Fire-and-forget history logging
+      void history.add({ type: 'register', summary: `Registered new user ${user.username}` }).catch(() => {});
     },
   });
 
   const logout = () => {
-    setToken(null);
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(AUTH_KEY);
+    setAuth(null);
     queryClient.clear();
-    // Force reload to redirect to login page
-    window.location.reload();
+    // No hard reload to avoid 404 in static deployments; ProtectedRoute will render Login
+    try {
+      window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
+    } catch {}
+    // Fire-and-forget history logging
+    void history.add({ type: 'logout', summary: 'Logged out' }).catch(() => {});
   };
 
   const updateOnboardingStatus = useMutation({
     mutationFn: async (hasCompleted: boolean) => {
-      const res = await apiRequest("PUT", "/api/auth/onboarding", { hasCompletedOnboarding: hasCompleted });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      if (!auth?.user) return;
+      const updated: User = { ...auth.user, hasCompletedOnboarding: hasCompleted };
+      setLoggedIn(updated, { preserveExpiry: true });
+      return updated;
     },
   });
 
-  // Set up axios interceptor for authenticated requests
-  useEffect(() => {
-    if (token) {
-      const originalFetch = window.fetch;
-      window.fetch = async (url, options = {}) => {
-        if (typeof url === 'string' && url.startsWith('/api') && url !== '/api/auth/login' && url !== '/api/auth/register') {
-          options.headers = {
-            ...options.headers,
-            'Authorization': `Bearer ${token}`,
-          };
-        }
-        return originalFetch(url, options);
-      };
-    }
-  }, [token]);
+  const updateProfileImageMutation = useMutation({
+    mutationFn: async (profileimage: string) => {
+      if (!auth?.user?.id) throw new Error('Missing user id');
+      // Persist to API unless default demo user
+      if (auth.user.id !== 'default') {
+        await apiRequest('PUT', `/api/users/${auth.user.id}`, { profileimage });
+      }
+      // Persist locally for default/demo user so it survives logout/login
+      try {
+        const usernameKey = auth.user.username || 'default';
+        localStorage.setItem(AVATAR_CACHE_PREFIX + usernameKey, profileimage);
+      } catch {}
+      const updated: User = { ...auth.user, profileimage };
+      setLoggedIn(updated, { preserveExpiry: true });
+      return updated;
+    },
+  });
 
   return {
-    user,
-    isLoading: isLoading && !!token,
+    user: auth?.user ?? null,
+    isLoading: false,
     login: loginMutation.mutateAsync,
     register: registerMutation.mutateAsync,
     logout,
     updateOnboardingStatus: updateOnboardingStatus.mutateAsync,
+    updateProfileImage: updateProfileImageMutation.mutateAsync,
     isLoginLoading: loginMutation.isPending,
     isRegisterLoading: registerMutation.isPending,
   };

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Shield, Plus, Search, Key, CheckCircle } from "lucide-react";
+import { AppLogo } from "@/components/app-logo";
 
 interface OnboardingGuideProps {
   isOpen: boolean;
@@ -11,28 +12,40 @@ interface OnboardingGuideProps {
 
 const onboardingSteps = [
   {
-    title: "Welcome to Lockify Auto",
-    description: "Your secure password manager is ready to protect your digital life.",
-    icon: Shield,
-    content: "Lockify Auto keeps your passwords safe with military-grade encryption. All your data is protected by your master password.",
+    title: "Welcome to Lockify",
+    description: "Secure password management with industry-standard encryption.",
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="141"
+        height="166"
+        viewBox="0 0 141 166"
+        className="w-9 h-9 text-foreground"
+        fill="currentColor"
+      >
+        <path d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
+        <path d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
+      </svg>
+    ),
+    content: "All passwords are encrypted using advanced algorithms and protected by your master password.",
   },
   {
     title: "Add Your First Password",
-    description: "Start by storing your first email and password combination.",
+    description: "Store credentials securely with the 'Add New Record' button.",
     icon: Plus,
-    content: "Click the 'Add New Record' button to store your first password. Each record contains an email, password, and optional description.",
+    content: "Each record includes email/username, encrypted password, optional description, and star marking.",
   },
   {
-    title: "Use the Password Generator",
-    description: "Generate strong, secure passwords for better protection.",
+    title: "Password Generator",
+    description: "Generate strong, unique passwords meeting modern security standards.",
     icon: Key,
-    content: "Use our built-in password generator to create strong, unique passwords for each of your accounts. The generator allows you to customize length and character types.",
+    content: "Customize length and character types: uppercase, lowercase, numbers, and symbols.",
   },
   {
-    title: "Search and Organize",
-    description: "Quickly find your passwords when you need them.",
+    title: "Search and Organization",
+    description: "Quickly locate credentials with powerful search and filtering.",
     icon: Search,
-    content: "Use the search bar to quickly find specific records by email or description. You can also sort and filter your records for better organization.",
+    content: "Find records by email, description, or service type with advanced filters.",
   },
 ];
 
@@ -61,11 +74,11 @@ export function OnboardingGuide({ isOpen, onComplete }: OnboardingGuideProps) {
   const Icon = currentStepData.icon;
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-lg" data-testid="modal-onboarding" aria-describedby="onboarding-description">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onComplete(); }}>
+      <DialogContent className="sm:max-w-2xl" data-testid="modal-onboarding" aria-describedby="onboarding-description">
         <DialogHeader className="text-center space-y-4">
           <div className="bg-primary rounded-lg p-3 w-fit mx-auto">
-            <Icon className="w-8 h-8 text-primary-foreground" />
+            {typeof Icon === 'object' ? Icon : <Icon className="w-8 h-8 text-primary-foreground" />}
           </div>
           <DialogTitle data-testid="text-onboarding-title">
             {currentStepData.title}
@@ -129,7 +142,6 @@ export function OnboardingGuide({ isOpen, onComplete }: OnboardingGuideProps) {
                 {currentStep === onboardingSteps.length - 1 ? (
                   <span className="flex items-center space-x-2">
                     <CheckCircle className="w-4 h-4" />
-                    <span>Get Started</span>
                   </span>
                 ) : (
                   "Next"

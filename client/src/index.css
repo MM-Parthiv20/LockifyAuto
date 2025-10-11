@@ -60,7 +60,7 @@
   --card-foreground: hsl(35 25% 95%);
   --popover: hsl(220 13% 12%);
   --popover-foreground: hsl(35 25% 95%);
-  --primary: hsl(217.2 91.2% 59.8%);
+  --primary: hsl(45, 25%, 97%);
   --primary-foreground: hsl(220 13% 8%);
   --secondary: hsl(220 13% 15%);
   --secondary-foreground: hsl(35 25% 95%);
@@ -80,13 +80,13 @@
   --chart-5: hsl(341.4894 75.2000% 50.9804%);
   --sidebar: hsl(222.2 84% 4.9%);
   --sidebar-foreground: hsl(210 40% 98%);
-  --sidebar-primary: hsl(217.2 91.2% 59.8%);
+  --sidebar-primary:#f9f8f5;
   --sidebar-primary-foreground: hsl(222.2 84% 4.9%);
   --sidebar-accent: hsl(217.2 32.6% 17.5%);
   --sidebar-accent-foreground: hsl(210 40% 98%);
   --sidebar-border: hsl(217.2 32.6% 17.5%);
   --sidebar-ring: hsl(224.3 76.3% 94.1%);
-  --font-sans: Inter, sans-serif;
+  --font-sans: 'Poppins', sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: 0.5rem;
@@ -165,3 +165,135 @@
     @apply font-semibold;
   }
 }
+
+/* width */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #ffffff00; 
+}
+ 
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #555; 
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #7a7a7a; 
+}
+
+.calender--wrapper{
+  thead,tbody{
+    tr{
+      justify-content: center;
+    }
+  }
+}
+
+/* Intro.js theming to match project variables (force override) */
+.introjs-overlay {
+  background: rgb(0 0 0 / 45%) !important;
+}
+
+.introjs-helperLayer {
+  border-radius: var(--radius) !important;
+  box-shadow: 0 0 1px 2px var(--ring), 0 0 0 9999px rgb(0 0 0 / 60%) !important;
+}
+
+.introjs-tooltip {
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.introjs-tooltip-header {
+  border-bottom: 1px solid var(--border) !important;
+  display: none !important;
+}
+
+.introjs-tooltip-title {
+  color: var(--foreground) !important;
+}
+
+.introjs-tooltiptext {
+  color: var(--muted-foreground) !important;
+}
+.introjs-bullets{
+  padding-top: 0 !important;
+}
+
+.introjs-bullets ul li a {
+  background: var(--muted) !important;
+}
+.introjs-bullets ul li a.active {
+  background: var(--primary) !important;
+}
+
+.introjs-progressbar {
+  background-color: var(--primary) !important;
+}
+
+/* Hide progress container */
+.introjs-progress {
+  display: none !important;
+}
+.introjs-tooltipbuttons{
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap:5px;
+}
+.introjs-prevbutton{
+  margin-left: auto;
+}
+.introjs-custom-skip{
+  order: -1;
+}
+
+.introjs-button {
+  border-radius: calc(var(--radius) - 2px) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--secondary) !important;
+  color: var(--secondary-foreground) !important;
+  text-shadow: none !important;
+}
+.introjs-button:hover {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+.introjs-skipbutton {
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  border-color: transparent !important;
+}
+.introjs-nextbutton,
+.introjs-donebutton {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border-color: var(--primary) !important;
+}
+.introjs-nextbutton:hover,
+.introjs-donebutton:hover {
+  filter: brightness(0.95) !important;
+}
+
+/* Custom Intro.js tooltip width */
+.intro-tooltip-wide {
+  min-width: 400px !important;
+  max-width: 300px !important;
+}
+
+@media (max-width: 640px) {
+  .intro-tooltip-wide {
+    min-width: 280px !important;
+    max-width: 320px !important;
+  }
+}
+
+

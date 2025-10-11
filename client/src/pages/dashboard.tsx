@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,52 +14,475 @@ import { DeleteModal } from "@/components/delete-modal";
 
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { PasswordGenerator } from "@/components/password-generator";
-import { Shield, Plus, Search, Filter, Moon, Sun, LogOut, Key, ArrowUpDown, Calendar } from "lucide-react";
+import { Plus, Search, Filter, Moon, Sun, Key, ArrowUpDown, Calendar as CalendarIcon, User, Loader2, X, RefreshCcw, Trash2, MoreVertical, ArrowLeft, RefreshCw } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 
-type SortOption = "newest" | "oldest" | "email" | "updated";
+import LoadingSpinner from "@/components/loading-spinner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { history, HistoryEvent } from "@/lib/history";
+
+type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 
 export default function Dashboard() {
-  const { user, logout, updateOnboardingStatus } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const { user, updateOnboardingStatus } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  // Redirect to login if no user is authenticated
+  if (!user) {
+    setLocation("/login");
+    return null;
+  }
+  // Load filter settings from sessionStorage on mount
+  const loadFilterSettings = () => {
+    try {
+      const saved = sessionStorage.getItem('lockify-filter-settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          searchQuery: parsed.searchQuery || "",
+          sortBy: parsed.sortBy || "newest",
+          createdDateRange: parsed.createdDateRange ? {
+            from: parsed.createdDateRange.from ? new Date(parsed.createdDateRange.from) : undefined,
+            to: parsed.createdDateRange.to ? new Date(parsed.createdDateRange.to) : undefined,
+          } : undefined,
+          selectedDomains: parsed.selectedDomains || [],
+          hasDescriptionOnly: parsed.hasDescriptionOnly || false,
+          starredOnly: parsed.starredOnly || false,
+          selectedCategories: parsed.selectedCategories || [],
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load filter settings:', e);
+    }
+    return null;
+  };
+
+  const savedSettings = loadFilterSettings();
+
+  const [searchQuery, setSearchQuery] = useState(savedSettings?.searchQuery || "");
+  const [sortBy, setSortBy] = useState<SortOption>(savedSettings?.sortBy || "newest");
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isPasswordGeneratorOpen, setIsPasswordGeneratorOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PasswordRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
+  const [loading, setLoading] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [createdDateRange, setCreatedDateRange] = useState<DateRange | undefined>(savedSettings?.createdDateRange);
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  const [activeDateField, setActiveDateField] = useState<"from" | "to" | null>(null);
+  const [domainInput, setDomainInput] = useState("");
+  const [selectedDomains, setSelectedDomains] = useState<string[]>(savedSettings?.selectedDomains || []);
+  const [hasDescriptionOnly, setHasDescriptionOnly] = useState<boolean>(savedSettings?.hasDescriptionOnly || false);
+  const [starredOnly, setStarredOnly] = useState<boolean>(savedSettings?.starredOnly || false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(savedSettings?.selectedCategories || []);
+  const [isMoreCategoriesModalOpen, setIsMoreCategoriesModalOpen] = useState(false);
+  const domainInputRef = useRef<HTMLInputElement | null>(null);
+  const calendarRef = useRef<HTMLDivElement | null>(null);
+  const wasEmptyBeforeAddRef = useRef<boolean>(false);
+  const avatarUrl = (() => {
+    if (user?.profileimage) return user.profileimage;
+    const seed = (user?.id || user?.username || "1").length % 100 || 1;
+    return `https://avatar.iran.liara.run/public/${seed}`;
+  })();
 
   const { data: records = [], isLoading } = useQuery<PasswordRecord[]>({
     queryKey: ["/api/records"],
   });
 
-  // Check onboarding status
-  useEffect(() => {
-    if (user && !user.hasCompletedOnboarding) {
-      setIsOnboardingOpen(true);
+  const queryClientRQ = useQueryClient();
+  const toggleStarMutation = useMutation({
+    mutationFn: async (r: PasswordRecord) => {
+      await apiRequest("PUT", `/api/records/${r.id}`, { starred: !r.starred });
+      return { id: r.id, starred: !r.starred };
+    },
+    onMutate: async (r) => {
+      await queryClientRQ.cancelQueries({ queryKey: ["/api/records"] });
+      const previous = queryClientRQ.getQueryData<PasswordRecord[]>(["/api/records"]);
+      if (previous) {
+        const updated = previous.map((rec) => rec.id === r.id ? ({ ...rec, starred: !rec.starred } as any) : rec);
+        queryClientRQ.setQueryData(["/api/records"], updated as any);
+      }
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) queryClientRQ.setQueryData(["/api/records"], context.previous);
+    },
+    onSettled: () => {
+      // Do not refetch; cache already updated optimistically
+      // Fire-and-forget history logging
+      void history.add({ type: "record: toggleStar", summary: "Toggled star on a record" }).catch(() => {});
+    },
+  });
+
+  const toggleStar = (record: PasswordRecord) => toggleStarMutation.mutate(record);
+  const isTrashView = location === "/trash";
+  const isHistoryView = location === "/history";
+  const trashedRecords = (records as any[]).filter((r) => r.isDeleted);
+  const nonDeletedRecords = (records as any[]).filter((r) => !r.isDeleted);
+  const { toast } = useToast();
+
+  // History page state (for /history)
+  const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
+  const [historyFilter, setHistoryFilter] = useState("");
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  
+  const loadHistoryEvents = async () => {
+    try {
+      setIsHistoryLoading(true);
+      const events = await history.list();
+      setHistoryEvents(events);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+    } finally {
+      setIsHistoryLoading(false);
     }
+  };
+  
+  useEffect(() => {
+    loadHistoryEvents();
+    
+    const refresh = () => {
+      loadHistoryEvents();
+    };
+    window.addEventListener('lockify-history-updated' as any, refresh as any);
+    return () => window.removeEventListener('lockify-history-updated' as any, refresh as any);
+  }, []);
+  
+  const filteredHistory = (() => {
+    const q = historyFilter.trim().toLowerCase();
+    if (!q) return historyEvents;
+    return historyEvents.filter((e: HistoryEvent) => e.summary.toLowerCase().includes(q) || e.type.toLowerCase().includes(q));
+  })();
+  const formatHistoryTime = (ts: number) => new Date(ts).toLocaleString();
+
+  // Save filter settings to sessionStorage whenever they change
+  useEffect(() => {
+    try {
+      const filterSettings = {
+        searchQuery,
+        sortBy,
+        createdDateRange: createdDateRange ? {
+          from: createdDateRange.from?.toISOString(),
+          to: createdDateRange.to?.toISOString(),
+        } : undefined,
+        selectedDomains,
+        hasDescriptionOnly,
+        starredOnly,
+        selectedCategories,
+      };
+      sessionStorage.setItem('lockify-filter-settings', JSON.stringify(filterSettings));
+    } catch (e) {
+      console.error('Failed to save filter settings:', e);
+    }
+  }, [searchQuery, sortBy, createdDateRange, selectedDomains, hasDescriptionOnly, starredOnly, selectedCategories]);
+
+  // Auto-delete trashed records older than 30 days when viewing Trash
+  useEffect(() => {
+    if (!isTrashView || trashedRecords.length === 0) return;
+    const now = Date.now();
+    const cutoffMs = 30 * 24 * 60 * 60 * 1000;
+    (async () => {
+      let deletedCount = 0;
+      for (const r of trashedRecords as any[]) {
+        const deletedAtMs = r.deletedAt ? new Date(r.deletedAt as any).getTime() : undefined;
+        if (deletedAtMs !== undefined && now - deletedAtMs >= cutoffMs) {
+          try {
+            await apiRequest("DELETE", `/api/records/${r.id}`);
+            deletedCount += 1;
+          } catch {}
+        }
+      }
+      if (deletedCount > 0) {
+        queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+        toast({ title: "Auto-removed old items", description: `${deletedCount} item(s) older than 30 days were deleted.` });
+        // Fire-and-forget history logging
+        void history.add({ type: "trash: autoDelete", summary: `Auto-deleted ${deletedCount} item(s) from Trash` }).catch(() => {});
+      }
+    })();
+  }, [isTrashView, trashedRecords]);
+
+  const getDaysLeft = (deletedAt?: any): number | null => {
+    if (!deletedAt) return null;
+    const deletedMs = new Date(deletedAt as any).getTime();
+    if (Number.isNaN(deletedMs)) return null;
+    const now = Date.now();
+    const total = 30 * 24 * 60 * 60 * 1000;
+    const elapsed = now - deletedMs;
+    const remainingMs = total - elapsed;
+    return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  };
+
+  // Reusable Intro.js guided tour starter
+  const ensureIntroCss = () => {
+    const id = "introjs-style";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = "https://unpkg.com/intro.js/minified/introjs.min.css";
+    document.head.appendChild(link);
+  };
+
+  const startTour = async () => {
+    try {
+      ensureIntroCss();
+      const mod: any = await import("intro.js");
+      const intro = (mod.default || mod.introJs)();
+      intro.setOptions({
+        // lock down interactions outside the tooltip
+        disableInteraction: true,
+        exitOnOverlayClick: false,
+        exitOnEsc: true,
+        // controls and labels
+        showButtons: true,
+        showBullets: true,
+        showProgress: true,
+        skipLabel: "Skip Tour",
+        nextLabel: "Next →",
+        prevLabel: "← Back",
+        doneLabel: "Get Started!",
+        // Position and appearance
+        tooltipPosition: "auto",
+        positionPrecedence: ["bottom", "top", "right", "left"],
+        scrollToElement: true,
+        scrollPadding: 30,
+        overlayOpacity: 0.8,
+        // Steps with detailed content
+        tooltipClass: "intro-tooltip-wide",
+        steps: [
+          { 
+            title: "Welcome to Lockify",
+            intro: "Secure password management solution. This tour covers essential features." 
+          },
+          { 
+            element: "#tour-avatar", 
+            title: "Profile & Account",
+            intro: "Access settings, history, and preferences via your avatar.",
+            position: "bottom"
+          },
+          { 
+            element: "#tour-search", 
+            title: "Search",
+            intro: "Locate credentials by email, username, or description in real-time.",
+            position: "bottom"
+          },
+          { 
+            element: "#tour-sort", 
+            title: "Sorting",
+            intro: "Sort by date, email (A-Z), last update, or starred items.",
+            position: "bottom"
+          },
+          { 
+            element: "#tour-filters", 
+            title: "Advanced Filters",
+            intro: "Filter by date range, domain, description, or starred items.",
+            position: "bottom"
+          },
+          { 
+            element: window.innerWidth >= 1280 ? "#tour-password-generator" : "#tour-password-generator-mobile", 
+            title: "Password Generator",
+            intro: "Generate secure passwords with customizable length (8-128) and character types.",
+            position: window.innerWidth >= 1280 ? "left" : "left"
+          },
+          { 
+            element: window.innerWidth >= 1280 ? "#tour-add-record" : "#tour-add-record-mobile", 
+            title: "Add Password",
+            intro: "Store encrypted passwords with email, description, and star marking.",
+            position: window.innerWidth >= 1280 ? "left" : "left"
+          },
+        ],
+      });
+      const injectSkipButton = () => {
+        try {
+          const tooltips = document.querySelectorAll('.introjs-tooltip');
+          if (!tooltips.length) return;
+          const btnContainers = document.querySelectorAll('.introjs-tooltipbuttons');
+          btnContainers.forEach((container) => {
+            if (!container.querySelector('.introjs-custom-skip')) {
+              const skipBtn = document.createElement('a');
+              skipBtn.className = 'introjs-button introjs-custom-skip';
+              skipBtn.textContent = 'Skip';
+              skipBtn.addEventListener('click', () => intro.exit());
+              container.appendChild(skipBtn);
+            }
+          });
+        } catch {}
+      };
+      
+      const markComplete = async () => { 
+        try { 
+          await updateOnboardingStatus(true); 
+        } catch {} 
+      };
+      
+      intro.oncomplete(async () => {
+        await markComplete();
+        try { 
+          sessionStorage.setItem('lockify-tour-done', '1'); 
+        } catch {}
+        (window as any).__lockifyTourRunning = false;
+      });
+      
+      intro.onexit(async () => {
+        // Mark as complete even when exiting/skipping to prevent tour from repeating
+        await markComplete();
+        try { 
+          sessionStorage.setItem('lockify-tour-done', '1'); 
+        } catch {}
+        (window as any).__lockifyTourRunning = false;
+      });
+      
+      intro.onafterchange(injectSkipButton);
+      intro.onchange(injectSkipButton);
+      
+      (window as any).__lockifyTourRunning = true;
+      intro.start();
+      // ensure first step has skip
+      setTimeout(injectSkipButton, 0);
+    } catch (error) {
+      console.error("Tour initialization failed:", error);
+    }
+  };
+
+  // Expose manual trigger for editing/QA
+  useEffect(() => {
+    (window as any).startLockifyTutorial = startTour;
+  }, []);
+
+  // Auto-run tour for first-time users
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const done = sessionStorage.getItem('lockify-tour-done');
+      if (user.hasCompletedOnboarding || done === '1') return;
+      if ((window as any).__lockifyTourRunning) return;
+    } catch {}
+    const t = window.setTimeout(() => { if (!(window as any).__lockifyTourRunning) startTour(); }, 300);
+    return () => window.clearTimeout(t);
   }, [user]);
+  useEffect(() => {
+    if (filterOpen) setShowCalendar(false);
+  }, [filterOpen]);
+
+  // Close calendar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setShowCalendar(false);
+      }
+    };
+
+    if (showCalendar) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCalendar]);
+
+  const deriveDomain = (email: string) => {
+    const parts = email.split("@");
+    return parts.length > 1 ? parts[1].toLowerCase() : "";
+  };
+
+  const commonDomains = (() => {
+    const counter = new Map<string, number>();
+    for (const r of records) {
+      const d = deriveDomain(r.email);
+      if (!d) continue;
+      counter.set(d, (counter.get(d) ?? 0) + 1);
+    }
+    const inferred = Array.from(counter.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([d]) => d);
+    const defaults = [
+      "gmail.com",
+      "yahoo.com",
+      "outlook.com",
+    ];
+    const set = new Set<string>();
+    const merged: string[] = [];
+    for (const d of [...inferred, ...defaults]) {
+      const dd = d.toLowerCase();
+      if (dd && !set.has(dd)) {
+        set.add(dd);
+        merged.push(dd);
+      }
+      if (merged.length >= 15) break;
+    }
+    return merged;
+  })();
+
+  const activeFilterCount = (() => {
+    let n = 0;
+    if (createdDateRange?.from || createdDateRange?.to) n += 1;
+    if (selectedDomains.length > 0) n += 1;
+    if (hasDescriptionOnly) n += 1;
+    if (starredOnly) n += 1;
+    if (selectedCategories.length > 0) n += 1;
+    return n;
+  })();
 
   const filteredAndSortedRecords = (() => {
-    let filtered = records.filter(record =>
+    let filtered = records.filter(record => {
+      if ((record as any).isDeleted) return false;
+      const matchesQuery =
       record.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-    );
+        (record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+
+      // Date range filter (createdAt)
+      const createdTime = record.createdAt ? new Date(record.createdAt as any).getTime() : undefined;
+      const fromOk = createdDateRange?.from ? (createdTime ?? 0) >= new Date(createdDateRange.from).getTime() : true;
+      const toOk = createdDateRange?.to ? (createdTime ?? 0) <= new Date(createdDateRange.to).getTime() : true;
+
+      // Domains filter
+      const domain = deriveDomain(record.email);
+      const domainOk = selectedDomains.length === 0 || selectedDomains.includes(domain);
+
+      // Description filter
+      const descOk = !hasDescriptionOnly || (record.description && record.description.trim().length > 0);
+
+      // Starred filter
+      const starOk = !starredOnly || Boolean((record as any).starred);
+
+      // Category filter
+      const categoryOk = selectedCategories.length === 0 || selectedCategories.includes((record as any).userType || "gmail");
+
+      return matchesQuery && fromOk && toOk && domainOk && descOk && starOk && categoryOk;
+    });
 
     // Sort records
     switch (sortBy) {
-      case "newest":
-        filtered = [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case "newest": {
+        const getTime = (d: any) => (d ? new Date(d as any).getTime() : 0);
+        filtered = [...filtered].sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
         break;
-      case "oldest":
-        filtered = [...filtered].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      }
+      case "oldest": {
+        const getTime = (d: any) => (d ? new Date(d as any).getTime() : 0);
+        filtered = [...filtered].sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt));
         break;
+      }
       case "email":
         filtered = [...filtered].sort((a, b) => a.email.localeCompare(b.email));
         break;
-      case "updated":
-        filtered = [...filtered].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      case "updated": {
+        const getTime = (d: any) => (d ? new Date(d as any).getTime() : 0);
+        filtered = [...filtered].sort((a, b) => getTime(b.updatedAt) - getTime(a.updatedAt));
+        break;
+      }
+      case "starred":
+        filtered = [...filtered].sort((a, b) => Number(Boolean((b as any).starred)) - Number(Boolean((a as any).starred)));
         break;
     }
 
@@ -66,6 +490,7 @@ export default function Dashboard() {
   })();
 
   const handleAddRecord = () => {
+    wasEmptyBeforeAddRef.current = records.length === 0;
     setSelectedRecord(null);
     setModalMode("add");
     setIsRecordModalOpen(true);
@@ -82,15 +507,9 @@ export default function Dashboard() {
     setIsDeleteModalOpen(true);
   };
 
-
-
   const handleOnboardingComplete = async () => {
-    try {
-      await updateOnboardingStatus(true);
-      setIsOnboardingOpen(false);
-    } catch (error) {
-      console.error("Failed to update onboarding status:", error);
-    }
+    await updateOnboardingStatus(true);
+    setIsOnboardingOpen(false);
   };
 
   const getSortLabel = (sort: SortOption) => {
@@ -99,35 +518,50 @@ export default function Dashboard() {
       case "oldest": return "Oldest First";
       case "email": return "Email A-Z";
       case "updated": return "Recently Updated";
+      case "starred": return "Starred First";
     }
   };
 
-
-
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-lg text-muted-foreground">Loading your records...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground">
+        <LoadingSpinner colorClassName="text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       {/* Navigation Header */}
       <nav className="bg-card border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Brand */}
-            <div className="flex items-center space-x-3">
-              <div className="bg-primary rounded-lg p-2">
-                <Shield className="w-6 h-6 text-primary-foreground" />
+            <div className="flex items-center space-x-2" onClick={() => setLocation("/")}>
+              <div className="bg-primary/10 rounded-lg text-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-9 h-9 text-primary" fill="currentColor">
+              <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
+              <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
+              </svg>
               </div>
-              <h1 className="text-xl font-semibold text-foreground">Lockify Auto</h1>
+              <h1 className="text-xl font-semibold text-foreground">Lumora</h1>
             </div>
             
             {/* Right Side Controls */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+
+              {/* Manual Start Tour */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => startTour()}
+                className="p-2"
+                data-testid="button-start-tour"
+              >
+                <span className="hidden sm:inline">Start tour</span>
+                <span className="sm:hidden">Tour</span>
+              </Button>
+
               {/* Dark Mode Toggle */}
               <Button
                 variant="ghost"
@@ -183,7 +617,9 @@ export default function Dashboard() {
           </div>
         </div>
       </nav>
-
+      {/* Trash actions dropdown component */}
+      {false && <></>}
+  
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div>
@@ -536,15 +972,6 @@ export default function Dashboard() {
                                     src={categoryData} 
                                     alt={category}
                                     className="h-3.5 w-3.5 object-contain"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      if (!target.src.endsWith('/others.png')) {
-                                        target.src = "/images/social_icons/others.png";
-                                      } else {
-                                        target.style.display = 'none';
-                                      }
-                                    }}
                                   />
                                   {category}
                                 </button>
@@ -575,80 +1002,248 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-        {/* Records Grid */}
-        <div className="space-y-4">
-          {filteredAndSortedRecords.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-12 h-12 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">
-                {records.length === 0 ? "No passwords stored yet" : "No matching records"}
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                {records.length === 0 
-                  ? "Get started by adding your first email and password record"
-                  : "Try adjusting your search terms or sorting options"
-                }
-              </p>
-              {records.length === 0 && (
-                <div className="mobile-button-group flex flex-col sm:flex-row gap-2 justify-center">
-                  <Button onClick={handleAddRecord} className="btn" data-testid="button-add-first-record">
-                    Add Your First Record
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsPasswordGeneratorOpen(true)}
-                    className="btn"
-                    data-testid="button-try-generator"
-                  >
-                    Try Password Generator
-                  </Button>
+                        <DialogFooter className="pt-2">
+                          <div className="flex w-full justify-between">
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setCreatedDateRange(undefined);
+                                setSelectedDomains([]);
+                                setHasDescriptionOnly(false);
+                                setDomainInput("");
+                                setStarredOnly(false);
+                                setSelectedCategories([]);
+                                setSearchQuery("");
+                                setSortBy("newest");
+                                // Clear sessionStorage
+                                try {
+                                  sessionStorage.removeItem('lockify-filter-settings');
+                                } catch (e) {
+                                  console.error('Failed to clear filter settings:', e);
+                                }
+                              }}
+                            >
+                              Clear all
+                            </Button>
+                            <Button onClick={() => setFilterOpen(false)}>Done</Button>
+                          </div>
+                        </DialogFooter>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
+              </div>
+            </div>
+            )}
+  
+            {/* Main Content */}
+            <div className="space-y-4">
+              {isHistoryView ? (
+                <>
+                  <div className="flex flex-row gap-2 sm:items-center sm:justify-between">
+                    <div className="flex-1">
+                      <Input
+                        type="text"
+                        placeholder="Search history..."
+                        value={historyFilter}
+                        onChange={(e) => setHistoryFilter(e.target.value)}
+                        className="text-sm sm:text-base"
+                        data-testid="input-search-history"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      
+                      <Button variant="outline" size="icon" onClick={() => loadHistoryEvents()} className="sm:hidden size-8" title="Refresh">
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" onClick={() => loadHistoryEvents()} className="hidden sm:inline-flex">Refresh</Button>
+                      <Button variant="destructive" size="icon" disabled={historyEvents.length === 0} onClick={async () => { await history.clear(); setHistoryEvents([]); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="sm:hidden" title="Clear All">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="destructive" disabled={historyEvents.length === 0} onClick={async () => { await history.clear(); setHistoryEvents([]); toast({ title: "Deleted all history", description: "All activity history was deleted." }); }} className="hidden sm:inline-flex">Clear All</Button>
+                    </div>
+                  </div>
+                  {filteredHistory.length === 0 ? (
+                    <div className="text-center py-16 text-muted-foreground">No activity yet</div>
+                  ) : (
+                    filteredHistory.map((e) => (
+                      <div key={e.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm break-words">{e.summary}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{formatHistoryTime(e.timestamp)}</div>
+                        </div>
+                        <Badge variant="secondary" className="shrink-0 text-[10px] uppercase">{e.type}</Badge>
+                      </div>
+                    ))
+                  )}
+                </>
+              ) : isTrashView ? (
+                <>
+                    <div className="mb-4 flex items-center gap-2">
+                      <ArrowLeft
+                        className="w-8 h-8 rounded-md bg-primary/10 p-1 cursor-pointer"
+                        onClick={() => setLocation("/profile")}
+                      />
+                      <div>
+                        <h2 className="text-xl sm:text-3xl font-bold text-foreground">Trash</h2>
+                      </div>
+                    </div>
+                  {trashedRecords.length === 0 ? (
+                    <div className="text-center py-16 text-muted-foreground">No items in Trash</div>
+                  ) : (
+                    trashedRecords.map((r) => (
+                    <div key={r.id} className="border rounded-md p-3 flex items-center justify-between">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate flex items-center gap-2">
+                          {r.email}
+                         
+                        </div>
+                        {r.description && <div className="text-sm text-muted-foreground truncate">{r.description}</div>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                      {(() => {
+                            const deletedAt = (r as any).deletedAt;
+                            if (!deletedAt) return null;
+                            const deletedMs = new Date(deletedAt as any).getTime();
+                            if (Number.isNaN(deletedMs)) return null;
+                            const now = Date.now();
+                            const total = 30 * 24 * 60 * 60 * 1000;
+                            const remainingMs = Math.max(0, total - (now - deletedMs));
+                            const daysLeft = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+                            const urgent = daysLeft <= 3;
+                            return (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${urgent ? "bg-red-500 text-white" : "bg-muted text-foreground"}`} title={`Auto-deletes in ${daysLeft} day(s)`}>
+                                {daysLeft}d left
+                              </span>
+                            );
+                          })()}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          title="Restore"
+                          aria-label="Restore"
+                          onClick={async () => {
+                            await apiRequest("PUT", `/api/records/${r.id}`, { isDeleted: false, deletedAt: null });
+                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                            // Log history (no need to await)
+                            void history.add({ type: "record: restore", summary: `Restored: ${r.email}`, details: { id: r.id } }).catch(() => {});
+                          }}
+                        >
+                          <RefreshCcw className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          title="Delete forever"
+                          aria-label="Delete forever"
+                          onClick={async () => {
+                            await apiRequest("DELETE", `/api/records/${r.id}`);
+                            queryClientRQ.invalidateQueries({ queryKey: ["/api/records"] });
+                            // Log history (no need to await)
+                            void history.add({ type: "record: delete", summary: `Permanently deleted: ${r.email}`, details: { id: r.id } }).catch(() => {});
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                  )}
+                </>
+              ) : (
+                filteredAndSortedRecords.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 text-muted-foreground">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="141" height="166" viewBox="0 0 141 166" className="w-12 h-12 " fill="currentColor" >
+                        <path xmlns="http://www.w3.org/2000/svg" d="M70 46L70.5 83L101 101.5V148L69.5 166L0 125V41L31.5 23L70 46ZM8 120L69.5 156.263V120L38.5 102V64L8 46.5V120Z"/>
+                        <path xmlns="http://www.w3.org/2000/svg" d="M140.5 125L108.5 143.5V60.5L39 18.5L70 0L140.5 42V125Z"/>
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-foreground mb-2">
+                      {records.length === 0 ? "No passwords stored yet" : "No matching records"}
+                    </h3>
+                    <p className="text-muted-foreground mb-6">
+                      {records.length === 0 
+                        ? "Get started by adding your first email and password record"
+                        : "Try adjusting your search terms or sorting options"
+                      }
+                    </p>
+                    {records.length === 0 && (
+                      <div className="mobile-button-group flex flex-col sm:flex-row gap-2 justify-center">
+                        <Button onClick={handleAddRecord} className="btn" data-testid="button-add-first-record">
+                          Add Your First Record
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsPasswordGeneratorOpen(true)}
+                          className="btn"
+                          data-testid="button-try-generator"
+                        >
+                          Try Password Generator
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground">
+                      <span data-testid="text-records-count">
+                        {filteredAndSortedRecords.length} of {nonDeletedRecords.length} records
+                      </span>
+                      <span data-testid="text-sort-info">
+                        Sorted by {getSortLabel(sortBy)}
+                      </span>
+                    </div>
+                    {filteredAndSortedRecords.map((record) => (
+                      <PasswordRecordCard
+                        key={record.id}
+                        record={record}
+                        onEdit={handleEditRecord}
+                        onDelete={handleDeleteRecord}
+                        onToggleStar={toggleStar}
+                      />
+                    ))}
+                  </>
+                )
               )}
             </div>
-          ) : (
-            <>
-              <div className="flex justify-between items-center text-sm text-muted-foreground">
-                <span data-testid="text-records-count">
-                  {filteredAndSortedRecords.length} of {records.length} records
-                </span>
-                <span data-testid="text-sort-info">
-                  Sorted by {getSortLabel(sortBy)}
-                </span>
-              </div>
-              {filteredAndSortedRecords.map((record) => (
-                <PasswordRecordCard
-                  key={record.id}
-                  record={record}
-                  onEdit={handleEditRecord}
-                  onDelete={handleDeleteRecord}
-                />
-              ))}
-            </>
-          )}
-        </div>
+          </div>
       </main>
-
+  
       {/* Modals */}
       <RecordModal
         isOpen={isRecordModalOpen}
         onClose={() => setIsRecordModalOpen(false)}
         mode={modalMode}
         record={selectedRecord}
+        onCreateSuccess={async () => {
+          if (wasEmptyBeforeAddRef.current) {
+            try {
+              const mod = await import("canvas-confetti");
+              const confetti = mod.default;
+              confetti({
+                particleCount: 80,
+                spread: 70,
+                origin: { y: 0.6 },
+              });
+              setTimeout(() => confetti({ particleCount: 60, angle: 60, spread: 55, origin: { x: 0 } }), 150);
+              setTimeout(() => confetti({ particleCount: 60, angle: 120, spread: 55, origin: { x: 1 } }), 150);
+            } catch {}
+          }
+        }}
       />
-
+  
       <DeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         record={selectedRecord}
       />
-
+  
       <OnboardingGuide
         isOpen={isOnboardingOpen}
         onComplete={handleOnboardingComplete}
       />
-
+  
       <PasswordGenerator
         isOpen={isPasswordGeneratorOpen}
         onClose={() => setIsPasswordGeneratorOpen(false)}
@@ -713,15 +1308,6 @@ export default function Dashboard() {
                       src={categoryData} 
                       alt={category}
                       className="h-3.5 w-3.5 object-contain"
-                      loading="lazy"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        if (!target.src.endsWith('/others.png')) {
-                          target.src = "/images/social_icons/others.png";
-                        } else {
-                          target.style.display = 'none';
-                        }
-                      }}
                     />
                     {category}
                   </button>
@@ -737,3 +1323,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+// History modal removed; use Profile -> History button to access full page

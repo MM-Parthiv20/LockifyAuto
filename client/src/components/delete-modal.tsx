@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PasswordRecord } from "@shared/schema";
 import { AlertTriangle } from "lucide-react";
+import { history } from "@/lib/history";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -19,15 +20,20 @@ export function DeleteModal({ isOpen, onClose, record }: DeleteModalProps) {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!record) throw new Error("No record to delete");
-      const res = await apiRequest("DELETE", `/api/records/${record.id}`);
+      const now = new Date().toISOString();
+      const res = await apiRequest("PUT", `/api/records/${record.id}`, { isDeleted: true, deletedAt: now });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/records"] });
+    onSuccess: (updated: PasswordRecord) => {
+      // Update records cache in place (mark as deleted)
+      const current = queryClient.getQueryData<PasswordRecord[]>(["/api/records"]) || [];
+      const next = current.map((r) => (r.id === updated.id ? updated : r));
+      queryClient.setQueryData(["/api/records"], next);
       toast({
-        title: "Record deleted",
-        description: "Your password record has been deleted successfully",
+        title: "Moved to Trash",
       });
+      // Fire-and-forget history logging
+      void history.add({ type: "record:delete", summary: `Moved to Trash: ${record?.email}`, details: { id: record?.id } }).catch(() => {});
       onClose();
     },
     onError: (error: any) => {

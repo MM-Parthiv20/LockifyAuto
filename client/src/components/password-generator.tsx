@@ -127,6 +127,7 @@ export function PasswordGenerator({ isOpen, onClose, onPasswordSelect }: Passwor
               <Button
                 variant="outline"
                 size="sm"
+                className="p-3"
                 onClick={copyToClipboard}
                 disabled={!generatedPassword}
                 data-testid="button-copy-generated"
@@ -136,6 +137,7 @@ export function PasswordGenerator({ isOpen, onClose, onPasswordSelect }: Passwor
               <Button
                 variant="outline"
                 size="sm"
+                className="p-3"
                 onClick={generatePassword}
                 data-testid="button-generate-password"
               >

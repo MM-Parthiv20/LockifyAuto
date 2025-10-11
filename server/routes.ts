@@ -1,25 +1,19 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertPasswordRecordSchema, loginSchema, onboardingCompleteSchema } from "@shared/schema";
+import { insertUserSchema, insertPasswordRecordSchema, loginSchema, onboardingCompleteSchema, insertHistoryEventSchema } from "@shared/schema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-// Middleware to verify JWT token
+// JWT auth middleware
 const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-
+  if (!token) return res.status(401).json({ message: 'Access token required' });
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      return res.status(403).json({ message: 'Invalid or expired token' });
-    }
+    if (err) return res.status(403).json({ message: 'Invalid or expired token' });
     req.user = user;
     next();
   });
@@ -81,9 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      if (!user) return res.status(404).json({ message: "User not found" });
       res.json({ id: user.id, username: user.username, hasCompletedOnboarding: user.hasCompletedOnboarding });
     } catch (error) {
       res.status(500).json({ message: "Server error" });
@@ -97,11 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { hasCompletedOnboarding } = onboardingCompleteSchema.parse(req.body);
       const updatedUser = await storage.updateUserOnboarding(req.user.userId, hasCompletedOnboarding);
-      
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      if (!updatedUser) return res.status(404).json({ message: "User not found" });
       res.json({ hasCompletedOnboarding: updatedUser.hasCompletedOnboarding });
     } catch (error) {
       res.status(400).json({ message: "Invalid input data" });
@@ -167,6 +155,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Record deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete record" });
+    }
+  });
+
+  // History routes
+  app.get("/api/history", authenticateToken, async (req: any, res) => {
+    try {
+      const events = await storage.getHistoryEvents(req.user.userId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch history" });
+    }
+  });
+
+  app.post("/api/history", authenticateToken, async (req: any, res) => {
+    try {
+      const eventData = insertHistoryEventSchema.parse(req.body);
+      const event = await storage.createHistoryEvent({
+        ...eventData,
+        userId: req.user.userId
+      });
+      res.status(201).json(event);
+    } catch (error: any) {
+      if (error.issues) {
+        res.status(400).json({ message: "Validation failed", errors: error.issues });
+      } else {
+        res.status(400).json({ message: "Invalid input data" });
+      }
+    }
+  });
+
+  app.delete("/api/history", authenticateToken, async (req: any, res) => {
+    try {
+      const count = await storage.deleteHistoryEvents(req.user.userId);
+      res.json({ message: `Deleted ${count} history events` });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete history" });
     }
   });
 

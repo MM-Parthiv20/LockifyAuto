@@ -41,6 +41,11 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
+  // Explicitly serve the service worker in development to avoid falling through to index.html
+  app.get("/sw.js", (_req, res) => {
+    const swPath = path.resolve(import.meta.dirname, "..", "client", "sw.js");
+    res.sendFile(swPath);
+  });
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
@@ -68,13 +73,20 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Serve the Vite client build output (root-level dist)
+  const distPath = path.resolve(import.meta.dirname, "..", "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
   }
+
+  // Serve service worker from client root in production (not emitted to dist by Vite)
+  app.get("/sw.js", (_req, res) => {
+    const swPath = path.resolve(import.meta.dirname, "..", "client", "sw.js");
+    res.sendFile(swPath);
+  });
 
   app.use(express.static(distPath));
 

@@ -1,33 +1,58 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { PasswordRecord } from "@shared/schema";
-import { Copy, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { Copy, Edit, Trash2, Eye, EyeOff, Info, Star } from "lucide-react";
+import { getCategoryIcon, getCategoryLabel, isSocialMedia } from "@/components/record-modal";
 
 interface PasswordRecordCardProps {
   record: PasswordRecord;
   onEdit: (record: PasswordRecord) => void;
   onDelete: (record: PasswordRecord) => void;
+  onToggleStar?: (record: PasswordRecord) => void;
 }
 
-export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordCardProps) {
+export function PasswordRecordCard({ record, onEdit, onDelete, onToggleStar }: PasswordRecordCardProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
   const copyToClipboard = async (text: string, fieldName: string) => {
+    // Try modern API first
     try {
-      await navigator.clipboard.writeText(text);
-      toast({
-        title: "Copied to clipboard",
-        description: `${fieldName} has been copied to your clipboard`,
-      });
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for http/non-secure contexts or older browsers
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      toast({ title: "Copied to clipboard", description: `${fieldName} has been copied to your clipboard` });
     } catch (error) {
-      toast({
-        title: "Copy failed",
-        description: "Failed to copy to clipboard",
-        variant: "destructive",
-      });
+      try {
+        // Last-resort fallback using selection API
+        const range = document.createRange();
+        const node = document.createTextNode(text);
+        document.body.appendChild(node);
+        range.selectNode(node);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        document.execCommand("copy");
+        selection?.removeAllRanges();
+        document.body.removeChild(node);
+        toast({ title: "Copied to clipboard", description: `${fieldName} has been copied to your clipboard` });
+      } catch {
+        toast({ title: "Copy failed", description: "Failed to copy to clipboard", variant: "destructive" });
+      }
     }
   };
 
@@ -40,12 +65,82 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
   };
 
   return (
-    <Card className="password-card p-3 sm:p-4 hover:shadow-md transition-shadow" data-testid={`card-record-${record.id}`}>
+    <Card className="sm:p-4 hover:shadow-md transition-shadow" data-testid={`card-record-${record.id}`}>
+      {/* Mobile header actions */}
+      <div className="flex border-b items-center justify-between gap-1 sm:hidden p-2">
+        {/* Category Icon on the left */}
+        <div className="flex items-center gap-2 ml-1">
+          {record.userType && (
+            <div title={getCategoryLabel(record.userType)}>
+              {getCategoryIcon(record.userType)}
+            </div>
+          )}
+        </div>
+        
+        {/* Action buttons on the right */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 h-8 w-8 border"
+            onClick={() => onToggleStar && onToggleStar(record)}
+            data-testid={`button-star-mobile-${record.id}`}
+            title={record.starred ? "Unstar" : "Star"}
+          >
+            <Star className={`w-4 h-4 ${record.starred ? "text-yellow-500" : ""}`} fill={record.starred ? "currentColor" : "none"} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 h-8 w-8 border"
+            onClick={() => onEdit(record)}
+            data-testid={`button-edit-mobile-${record.id}`}
+            title="Edit"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 h-8 w-8 border text-destructive"
+            onClick={() => onDelete(record)}
+            data-testid={`button-delete-mobile-${record.id}`}
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-2 h-8 w-8 border"
+                title="Info"
+                data-testid={`button-info-mobile-${record.id}`}
+              >
+                <Info className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 text-xs">
+              <div className="space-y-1">
+                <div className="font-medium">Record info</div>
+                <div className="flex justify-between"><span>Created</span><span>{formatDate(record.createdAt as any)}</span></div>
+                <div className="flex justify-between"><span>Updated</span><span>{formatDate(record.updatedAt as any)}</span></div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
       {/* Compact Layout */}
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3 p-2 sm:p-0 pt-0">
         {/* Email Field - Compact */}
         <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Email</label>
+          <div className="flex items-center justify-between hidden sm:flex">
+            <label className="text-xs font-medium text-muted-foreground">
+              {isSocialMedia(record.userType) ? 'Username' : 'Email'}
+            </label>
+          </div>
           <div className="flex items-center space-x-2">
             <div className="flex-1 bg-muted rounded px-3 py-2 font-mono text-sm break-all min-w-0" data-testid={`text-email-${record.id}`}>
               {record.email}
@@ -53,9 +148,9 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => copyToClipboard(record.email, "Email")}
-              className="p-2 h-8 w-8 flex-shrink-0"
-              title="Copy email"
+              onClick={() => copyToClipboard(record.email, isSocialMedia(record.userType) ? "Username" : "Email")}
+              className="p-2 h-8 w-8 flex-shrink-0 border"
+              title={isSocialMedia(record.userType) ? "Copy username" : "Copy email"}
               data-testid={`button-copy-email-${record.id}`}
             >
               <Copy className="w-3 h-3" />
@@ -64,8 +159,8 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
         </div>
         
         {/* Password Field - Compact */}
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Password</label>
+        <div className="space-y-0.5 sm:space-y-1">
+          <label className="text-xs font-medium text-muted-foreground hidden sm:block">Password</label>
           <div className="flex items-center space-x-2">
             <div className="flex-1 bg-muted rounded px-3 py-2 font-mono text-sm break-all min-w-0" data-testid={`text-password-${record.id}`}>
               {showPassword ? record.password : "••••••••••••"}
@@ -74,7 +169,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
               variant="ghost"
               size="sm"
               onClick={() => setShowPassword(!showPassword)}
-              className="p-2 h-8 w-8 flex-shrink-0"
+              className="p-2 h-8 w-8 flex-shrink-0 border"
               title="Show/hide password"
               data-testid={`button-toggle-password-${record.id}`}
             >
@@ -84,7 +179,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
               variant="ghost"
               size="sm"
               onClick={() => copyToClipboard(record.password, "Password")}
-              className="p-2 h-8 w-8 flex-shrink-0"
+              className="p-2 h-8 w-8 flex-shrink-0 border"
               title="Copy password"
               data-testid={`button-copy-password-${record.id}`}
             >
@@ -95,8 +190,8 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
         
         {/* Description Field - Compact (only if exists) */}
         {record.description && (
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Description</label>
+          <div className="space-y-0.5 sm:space-y-1">
+            <label className="text-xs font-medium text-muted-foreground hidden sm:block">Description</label>
             <div className="flex items-start space-x-2">
               <div className="flex-1 bg-muted rounded px-3 py-2 text-sm break-words min-w-0" data-testid={`text-description-${record.id}`}>
                 {record.description}
@@ -105,7 +200,7 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
                 variant="ghost"
                 size="sm"
                 onClick={() => copyToClipboard(record.description!, "Description")}
-                className="p-2 h-8 w-8 flex-shrink-0 mt-0"
+                className="p-2 h-8 w-8 flex-shrink-0 mt-0 border"
                 title="Copy description"
                 data-testid={`button-copy-description-${record.id}`}
               >
@@ -116,13 +211,18 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
         )}
 
         {/* Action Buttons & Metadata - Single Row */}
-        <div className="flex items-center justify-between pt-2 border-t border-border">
-          <div className="text-xs text-muted-foreground">
-            <span data-testid={`text-created-${record.id}`}>
-              {formatDate(record.createdAt)}
-            </span>
-          </div>
+        <div className="hidden sm:flex items-center justify-between py-2 border-t border-border">
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => onToggleStar && onToggleStar(record)}
+              data-testid={`button-star-${record.id}`}
+              title={record.starred ? "Unstar" : "Star"}
+            >
+              <Star className={`w-3 h-3 ${record.starred ? "text-yellow-500" : ""}`} fill={record.starred ? "currentColor" : "none"} />
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -142,11 +242,18 @@ export function PasswordRecordCard({ record, onEdit, onDelete }: PasswordRecordC
               <Trash2 className="w-3 h-3" />
             </Button>
           </div>
+            {/* Category Icon for desktop - shown inline with label */}
+            {record.userType && (
+              <div className="hidden sm:flex items-center gap-1.5" title={getCategoryLabel(record.userType)}>
+                {getCategoryIcon(record.userType)}
+                <span className="text-xs text-muted-foreground">{getCategoryLabel(record.userType)}</span>
+              </div>
+            )}
         </div>
       </div>
       
-      {/* Record Metadata */}
-      <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
+      {/* Record Metadata (desktop/tablet only) */}
+      <div className="hidden sm:flex pt-4 border-t border-border justify-between items-center text-xs text-muted-foreground">
         <span data-testid={`text-created-${record.id}`}>
           Created: {formatDate(record.createdAt)}
         </span>
