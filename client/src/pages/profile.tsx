@@ -5,7 +5,7 @@ import { CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { PasswordRecord } from "@shared/schema";
-import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX, Play, Key, Moon, Sun, User } from "lucide-react";
+import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX, Play, Key, Moon, Sun, User, Info } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -177,7 +177,7 @@ export default function Profile() {
                 )}
 
                 <div className="flex mt-4 gap-2 text-sm justify-center">
-                  <Link href="/history" className="w-1/2">
+                  <Link href="/history" className="w-1/3">
                     <Button 
                       variant="outline"
                       size="sm"
@@ -193,7 +193,7 @@ export default function Profile() {
                       <span className="inline">History</span>
                     </Button>
                   </Link>
-                  <Link href="/trash" className="w-1/2">
+                  <Link href="/trash" className="w-1/3">
                     <Button 
                       variant="outline"
                       size="sm"
@@ -209,6 +209,18 @@ export default function Profile() {
                         <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                       </svg>
                       <span className="inline">Trash</span>
+                    </Button>
+                  </Link>
+                  <Link href="/about" className="w-1/3">
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2 p-2 w-full" 
+                      data-testid="button-profile-go-about"
+                      title="About Lumora"
+                    >
+                      <Info className="w-4 h-4" />
+                      <span className="inline">About</span>
                     </Button>
                   </Link>
                 </div>

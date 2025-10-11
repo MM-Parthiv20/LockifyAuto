@@ -243,6 +243,18 @@
 .introjs-progress {
   display: none !important;
 }
+.introjs-tooltipbuttons{
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap:5px;
+}
+.introjs-prevbutton{
+  margin-left: auto;
+}
+.introjs-custom-skip{
+  order: -1;
+}
 
 .introjs-button {
   border-radius: calc(var(--radius) - 2px) !important;
