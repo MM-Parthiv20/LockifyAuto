@@ -629,7 +629,7 @@ export default function Dashboard() {
           <div className="mb-4">
               
               {/* floating Add record and password generator */}
-              <div className="floating-button-group fixed bottom-4 right-4 xl:right-[13%] flex flex-col gap-3 items-end">
+              <div className="floating-button-group fixed bottom-4 right-4 xl:right-[13%] flex flex-col xl:gap-3 gap-2 items-end">
                 <Button
                   id="tour-password-generator-mobile"
                   onClick={() => setIsPasswordGeneratorOpen(true)}

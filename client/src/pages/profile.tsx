@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { PasswordRecord } from "@shared/schema";
-import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX, Play, Key, Moon, Sun, User, Info, Vibrate } from "lucide-react";
+import { Loader2, CircleCheck, CircleX, ArrowLeft, LogOut, Trash, Pencil, UserX, Play, Key, Moon, Sun, User, Info, Vibrate, Fingerprint } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -14,6 +14,8 @@ import AvatarPickerDialog from "@/components/avatar-picker-dialog";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { useTheme } from "@/components/theme-provider";
 import { VibrationPreference, Vibration } from "@/lib/vibration";
+import { useUserPreferences } from "@/hooks/use-user-preferences";
+import { useBiometric } from "@/hooks/use-biometric";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
@@ -27,6 +29,10 @@ export default function Profile() {
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [vibrationEnabled, setVibrationEnabled] = useState(() => VibrationPreference.isEnabled());
+  
+  // Biometric preferences
+  const { biometricEnabled, setBiometricEnabled } = useUserPreferences();
+  const { isSupported: biometricSupported, hasCredential, remove: removeBiometricCredential } = useBiometric();
 
   const stats = useMemo(() => ({
     total: (records as any[]).filter((r) => !r.isDeleted).length,
@@ -196,6 +202,46 @@ export default function Profile() {
                       data-testid="switch-vibration"
                     />
                   </div>
+
+                  {/* Biometric Authentication Toggle */}
+                  {biometricSupported && (
+                    <div className="flex items-center justify-between py-2 px-3 rounded-md border border-border bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <Fingerprint className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <div className="text-sm font-medium">Fingerprint Login</div>
+                          <div className="text-xs text-muted-foreground">
+                            {hasCredential(user?.id || '') 
+                              ? "Use fingerprint to sign in" 
+                              : "Set up fingerprint authentication"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={biometricEnabled}
+                        onCheckedChange={(checked) => {
+                          setBiometricEnabled(checked);
+                          if (!checked && hasCredential(user?.id || '')) {
+                            // Remove biometric credential when disabling
+                            removeBiometricCredential();
+                            toast({
+                              title: "Biometric authentication disabled",
+                              description: "Fingerprint login has been removed",
+                            });
+                          } else {
+                            toast({
+                              title: checked ? "Biometric authentication enabled" : "Biometric authentication disabled",
+                              description: checked 
+                                ? "You can now use fingerprint login on supported devices" 
+                                : "Fingerprint login is now disabled",
+                            });
+                          }
+                        }}
+                        data-testid="switch-biometric"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Complete Onboarding Button - only show if incomplete */}

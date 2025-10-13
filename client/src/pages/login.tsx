@@ -1,20 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Eye, EyeOff ,Moon, Sun} from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
 import { useAuth } from "@/lib/auth";
 import { AppLogo } from "@/components/app-logo";
+import BiometricAuth from "@/components/biometric-auth";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showBiometric, setShowBiometric] = useState(false);
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -23,6 +26,19 @@ export default function Login() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const { login } = useAuth();
+
+  // Check if we should show biometric options after user enters username
+  useEffect(() => {
+    if (formData.username.trim()) {
+      // Small delay to avoid showing biometric options too early
+      const timer = setTimeout(() => {
+        setShowBiometric(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setShowBiometric(false);
+    }
+  }, [formData.username]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +49,7 @@ export default function Login() {
 
     try {
       await login({ username: formData.username.trim(), password: formData.password });
-      toast({ title: "Login successful", description: "Welcome back to Lockify Auto!" });
+      toast({ title: "Login successful", description: "Welcome back to Lumora!" });
       // Ensure auth state is picked up app-wide
       window.location.replace("/");
     } catch (error) {
@@ -44,6 +60,20 @@ export default function Login() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleBiometricSuccess = async () => {
+    try {
+      await login({ username: formData.username.trim(), password: formData.password });
+      toast({ title: "Login successful", description: "Welcome back to Lumora!" });
+      window.location.replace("/");
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: "Biometric authentication succeeded but login failed",
+        variant: "destructive",
+      });
     }
   };
 
@@ -135,6 +165,25 @@ export default function Login() {
               {isLoading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
+
+          {/* Biometric Authentication Section */}
+          {showBiometric && formData.username.trim() && (
+            <>
+              <div className="my-4">
+                <Separator className="my-4">
+                  <span className="text-xs text-muted-foreground bg-background px-2">or</span>
+                </Separator>
+              </div>
+              
+              <BiometricAuth
+                userId={formData.username.trim()}
+                username={formData.username.trim()}
+                onSuccess={handleBiometricSuccess}
+                disabled={isLoading}
+                showRegisterOption={true}
+              />
+            </>
+          )}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
