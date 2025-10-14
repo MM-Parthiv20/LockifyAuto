@@ -26,6 +26,20 @@ export interface BiometricAuthResult {
   error?: string;
 }
 
+export interface BiometricToken {
+  userId: string;
+  username: string;
+  token: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface BiometricTokenResult {
+  success: boolean;
+  token?: BiometricToken;
+  error?: string;
+}
+
 /**
  * Check if biometric authentication is supported on this device/browser
  */
@@ -313,4 +327,144 @@ export const shouldOfferBiometric = async (): Promise<boolean> => {
   // Check biometric support
   const support = await checkBiometricSupport();
   return support.isSupported && support.hasPlatformAuthenticator;
+};
+
+/**
+ * Generate a biometric token for a user after successful login
+ * This token can be used for subsequent biometric logins
+ */
+export const generateBiometricToken = async (
+  userId: string,
+  username: string
+): Promise<BiometricTokenResult> => {
+  try {
+    // Generate a secure random token
+    const tokenBytes = crypto.getRandomValues(new Uint8Array(32));
+    const token = btoa(String.fromCharCode(...tokenBytes));
+    
+    // Token expires in 30 days
+    const now = Date.now();
+    const expiresAt = now + (30 * 24 * 60 * 60 * 1000);
+    
+    const biometricToken: BiometricToken = {
+      userId,
+      username,
+      token,
+      createdAt: now,
+      expiresAt
+    };
+
+    // Store the token securely in localStorage
+    // In a real app, this would be encrypted with device biometrics
+    try {
+      localStorage.setItem('lumora-biometric-token', JSON.stringify(biometricToken));
+    } catch (storageError) {
+      console.warn('Failed to store biometric token:', storageError);
+      return {
+        success: false,
+        error: 'Failed to store biometric token'
+      };
+    }
+
+    return {
+      success: true,
+      token: biometricToken
+    };
+  } catch (error) {
+    console.error('Failed to generate biometric token:', error);
+    return {
+      success: false,
+      error: 'Failed to generate biometric token'
+    };
+  }
+};
+
+/**
+ * Retrieve and validate a stored biometric token
+ */
+export const getBiometricToken = (): BiometricToken | null => {
+  try {
+    const stored = localStorage.getItem('lumora-biometric-token');
+    if (!stored) return null;
+    
+    const token: BiometricToken = JSON.parse(stored);
+    
+    // Check if token is expired
+    if (Date.now() > token.expiresAt) {
+      // Remove expired token
+      localStorage.removeItem('lumora-biometric-token');
+      return null;
+    }
+    
+    return token;
+  } catch (error) {
+    console.warn('Failed to retrieve biometric token:', error);
+    return null;
+  }
+};
+
+/**
+ * Remove stored biometric token
+ */
+export const removeBiometricToken = (): void => {
+  try {
+    localStorage.removeItem('lumora-biometric-token');
+  } catch (error) {
+    console.warn('Failed to remove biometric token:', error);
+  }
+};
+
+/**
+ * Check if user has a valid biometric token
+ */
+export const hasValidBiometricToken = (): boolean => {
+  return getBiometricToken() !== null;
+};
+
+/**
+ * Authenticate using biometric and retrieve stored token
+ */
+export const authenticateWithBiometricToken = async (
+  userId: string,
+  username: string
+): Promise<BiometricTokenResult> => {
+  try {
+    // First, authenticate with biometric
+    const authResult = await authenticateBiometric(userId, username);
+    
+    if (!authResult.success) {
+      return {
+        success: false,
+        error: authResult.error || 'Biometric authentication failed'
+      };
+    }
+
+    // Get the stored token
+    const token = getBiometricToken();
+    if (!token) {
+      return {
+        success: false,
+        error: 'No biometric token found. Please login normally first.'
+      };
+    }
+
+    // Verify the token matches the user
+    if (token.userId !== userId) {
+      return {
+        success: false,
+        error: 'Biometric token mismatch'
+      };
+    }
+
+    return {
+      success: true,
+      token
+    };
+  } catch (error) {
+    console.error('Biometric token authentication failed:', error);
+    return {
+      success: false,
+      error: 'Biometric token authentication failed'
+    };
+  }
 };

@@ -3,6 +3,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from './queryClient';
 import { history } from './history';
 import { VibrateIfEnabled } from './vibration';
+import { 
+  generateBiometricToken, 
+  authenticateWithBiometricToken, 
+  getBiometricToken,
+  removeBiometricToken,
+  type BiometricToken 
+} from './biometric';
 
 interface User {
   id: string;
@@ -124,6 +131,44 @@ export function useAuth() {
     },
   });
 
+  // Biometric token login mutation
+  const biometricLoginMutation = useMutation({
+    mutationFn: async (token: BiometricToken) => {
+      // For biometric token login, we trust the token and create user object
+      // In a real app, you'd validate the token with the server
+      let cachedAvatar: string | undefined;
+      try {
+        cachedAvatar = localStorage.getItem(AVATAR_CACHE_PREFIX + token.username) || undefined;
+      } catch {}
+      
+      // Check if this is the default user or a registered user
+      if (token.username === DEFAULT_CREDENTIALS.username) {
+        return { 
+          id: 'default', 
+          username: token.username, 
+          profileimage: cachedAvatar, 
+          hasCompletedOnboarding: true 
+        } as User;
+      } else {
+        // For registered users, we'd typically fetch from API
+        // For now, we'll use a default structure
+        return { 
+          id: token.userId, 
+          username: token.username, 
+          profileimage: cachedAvatar, 
+          hasCompletedOnboarding: false 
+        } as User;
+      }
+    },
+    onSuccess: (user) => {
+      setLoggedIn(user);
+      // ✅ Vibration feedback on successful biometric login
+      VibrateIfEnabled.short();
+      // Fire-and-forget history logging
+      void history.add({ type: 'login:biometric', summary: `Biometric login as ${user.username}` }).catch(() => {});
+    },
+  });
+
   const registerMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string }) => {
       // Check if username already exists before creating
@@ -157,6 +202,46 @@ export function useAuth() {
     } catch {}
     // Fire-and-forget history logging
     void history.add({ type: 'logout', summary: 'Logged out' }).catch(() => {});
+  };
+
+  // Generate biometric token after successful login
+  const generateTokenAfterLogin = async (user: User) => {
+    try {
+      const tokenResult = await generateBiometricToken(user.id, user.username);
+      if (tokenResult.success) {
+        console.log('Biometric token generated successfully');
+      } else {
+        console.warn('Failed to generate biometric token:', tokenResult.error);
+      }
+    } catch (error) {
+      console.warn('Error generating biometric token:', error);
+    }
+  };
+
+  // Biometric login function
+  const biometricLogin = async (userId: string, username: string) => {
+    try {
+      const result = await authenticateWithBiometricToken(userId, username);
+      if (result.success && result.token) {
+        await biometricLoginMutation.mutateAsync(result.token);
+        return { success: true };
+      } else {
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Biometric login failed';
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Check if user has biometric token
+  const hasBiometricToken = () => {
+    return getBiometricToken() !== null;
+  };
+
+  // Remove biometric token (for logout or settings)
+  const removeBiometricAuth = () => {
+    removeBiometricToken();
   };
 
   const updateOnboardingStatus = useMutation({
@@ -196,5 +281,11 @@ export function useAuth() {
     updateProfileImage: updateProfileImageMutation.mutateAsync,
     isLoginLoading: loginMutation.isPending,
     isRegisterLoading: registerMutation.isPending,
+    // Biometric functions
+    biometricLogin,
+    hasBiometricToken,
+    removeBiometricAuth,
+    generateTokenAfterLogin,
+    isBiometricLoginLoading: biometricLoginMutation.isPending,
   };
 }

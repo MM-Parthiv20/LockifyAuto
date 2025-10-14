@@ -12,6 +12,8 @@ import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/lib/auth";
 import { AppLogo } from "@/components/app-logo";
 import BiometricAuth from "@/components/biometric-auth";
+import { getBiometricToken } from "@/lib/biometric";
+import { useUserPreferences } from "@/hooks/use-user-preferences";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -25,7 +27,8 @@ export default function Login() {
 
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { login } = useAuth();
+  const { login, generateTokenAfterLogin } = useAuth();
+  const { biometricEnabled } = useUserPreferences();
 
   // Check if we should show biometric options after user enters username
   useEffect(() => {
@@ -48,8 +51,12 @@ export default function Login() {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
-      await login({ username: formData.username.trim(), password: formData.password });
+      const user = await login({ username: formData.username.trim(), password: formData.password });
       toast({ title: "Login successful", description: "Welcome back to Lumora!" });
+      
+      // Generate biometric token after successful login
+      await generateTokenAfterLogin(user);
+      
       // Ensure auth state is picked up app-wide
       window.location.replace("/");
     } catch (error) {
@@ -65,8 +72,12 @@ export default function Login() {
 
   const handleBiometricSuccess = async () => {
     try {
-      await login({ username: formData.username.trim(), password: formData.password });
+      const user = await login({ username: formData.username.trim(), password: formData.password });
       toast({ title: "Login successful", description: "Welcome back to Lumora!" });
+      
+      // Generate biometric token after successful login
+      await generateTokenAfterLogin(user);
+      
       window.location.replace("/");
     } catch (error) {
       toast({
@@ -167,7 +178,7 @@ export default function Login() {
           </form>
 
           {/* Biometric Authentication Section */}
-          {showBiometric && formData.username.trim() && (
+          {showBiometric && formData.username.trim() && biometricEnabled && (
             <>
               <div className="my-4">
                 <Separator className="my-4">
@@ -182,6 +193,13 @@ export default function Login() {
                 disabled={isLoading}
                 showRegisterOption={true}
               />
+              
+              {/* Show biometric token status if available */}
+              {getBiometricToken() && (
+                <div className="mt-2 text-xs text-center text-muted-foreground">
+                  Quick login token available for this device
+                </div>
+              )}
             </>
           )}
 

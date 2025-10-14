@@ -31,7 +31,7 @@ type SortOption = "newest" | "oldest" | "email" | "updated" | "starred";
 
 export default function Dashboard() {
   const { theme, setTheme } = useTheme();
-  const { user, updateOnboardingStatus } = useAuth();
+  const { user, updateOnboardingStatus, generateTokenAfterLogin } = useAuth();
   const [location, setLocation] = useLocation();
 
   // Redirect to login if no user is authenticated
@@ -39,6 +39,13 @@ export default function Dashboard() {
     setLocation("/login");
     return null;
   }
+
+  // Generate biometric token after successful login (if not already done)
+  useEffect(() => {
+    if (user) {
+      generateTokenAfterLogin(user);
+    }
+  }, [user, generateTokenAfterLogin]);
   // Load filter settings from sessionStorage on mount
   const loadFilterSettings = () => {
     try {

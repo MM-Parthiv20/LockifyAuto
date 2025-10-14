@@ -32,11 +32,82 @@ export default function Profile() {
   
   // Biometric preferences
   const { biometricEnabled, setBiometricEnabled } = useUserPreferences();
-  const { isSupported: biometricSupported, hasCredential, remove: removeBiometricCredential } = useBiometric();
+  const { 
+    isSupported: biometricSupported, 
+    hasCredential, 
+    remove: removeBiometricCredential,
+    authenticate,
+    register,
+    isAuthenticating,
+    isRegistering
+  } = useBiometric();
+  const { hasBiometricToken, removeBiometricAuth } = useAuth();
 
   const stats = useMemo(() => ({
     total: (records as any[]).filter((r) => !r.isDeleted).length,
   }), [records]);
+
+  // Biometric management functions
+  const handleSetupBiometric = async () => {
+    if (!user) return;
+    
+    try {
+      const result = await register(user.id, user.username);
+      if (result.success) {
+        toast({
+          title: "Biometric authentication set up",
+          description: "You can now use your fingerprint to log in"
+        });
+      } else {
+        toast({
+          title: "Setup failed",
+          description: result.error || "Failed to set up biometric authentication",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Setup failed",
+        description: "An error occurred while setting up biometric authentication",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTestBiometric = async () => {
+    if (!user) return;
+    
+    try {
+      const result = await authenticate(user.id, user.username);
+      if (result.success) {
+        toast({
+          title: "Biometric test successful",
+          description: "Your fingerprint authentication is working correctly"
+        });
+      } else {
+        toast({
+          title: "Test failed",
+          description: result.error || "Biometric authentication failed",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Test failed",
+        description: "An error occurred during biometric authentication",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRemoveBiometric = () => {
+    removeBiometricCredential();
+    removeBiometricAuth();
+    toast({
+      title: "Biometric authentication removed",
+      description: "All biometric data has been cleared from this device"
+    });
+  };
 
   // Prefer API-saved profile image; fallback to deterministic avatar
   const avatarUrl = useMemo(() => {
@@ -203,43 +274,122 @@ export default function Profile() {
                     />
                   </div>
 
-                  {/* Biometric Authentication Toggle */}
+                  {/* Biometric Authentication Section */}
                   {biometricSupported && (
-                    <div className="flex items-center justify-between py-2 px-3 rounded-md border border-border bg-muted/30">
-                      <div className="flex items-center gap-3">
-                        <Fingerprint className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <div className="text-sm font-medium">Fingerprint Login</div>
-                          <div className="text-xs text-muted-foreground">
-                            {hasCredential(user?.id || '') 
-                              ? "Use fingerprint to sign in" 
-                              : "Set up fingerprint authentication"
-                            }
+                    <div className="space-y-2">
+                      {/* Main Biometric Toggle */}
+                      <div className="flex items-center justify-between py-2 px-3 rounded-md border border-border bg-muted/30">
+                        <div className="flex items-center gap-3">
+                          <Fingerprint className="w-4 h-4 text-muted-foreground" />
+                          <div>
+                            <div className="text-sm font-medium">Fingerprint Login</div>
+                            <div className="text-xs text-muted-foreground">
+                              {hasCredential(user?.id || '') 
+                                ? "Use fingerprint to sign in" 
+                                : "Set up fingerprint authentication"
+                              }
+                            </div>
                           </div>
                         </div>
+                        <Switch
+                          checked={biometricEnabled}
+                          onCheckedChange={(checked) => {
+                            setBiometricEnabled(checked);
+                            if (!checked && hasCredential(user?.id || '')) {
+                              // Remove biometric credential when disabling
+                              handleRemoveBiometric();
+                            } else {
+                              toast({
+                                title: checked ? "Biometric authentication enabled" : "Biometric authentication disabled",
+                                description: checked 
+                                  ? "You can now use fingerprint login on supported devices" 
+                                  : "Fingerprint login is now disabled",
+                              });
+                            }
+                          }}
+                          data-testid="switch-biometric"
+                        />
                       </div>
-                      <Switch
-                        checked={biometricEnabled}
-                        onCheckedChange={(checked) => {
-                          setBiometricEnabled(checked);
-                          if (!checked && hasCredential(user?.id || '')) {
-                            // Remove biometric credential when disabling
-                            removeBiometricCredential();
-                            toast({
-                              title: "Biometric authentication disabled",
-                              description: "Fingerprint login has been removed",
-                            });
-                          } else {
-                            toast({
-                              title: checked ? "Biometric authentication enabled" : "Biometric authentication disabled",
-                              description: checked 
-                                ? "You can now use fingerprint login on supported devices" 
-                                : "Fingerprint login is now disabled",
-                            });
-                          }
-                        }}
-                        data-testid="switch-biometric"
-                      />
+
+                      {/* Biometric Management Actions */}
+                      {biometricEnabled && (
+                        <div className="flex gap-2 px-3">
+                          {!hasCredential(user?.id || '') ? (
+                            <Button
+                              size="sm"
+                              onClick={handleSetupBiometric}
+                              disabled={isRegistering}
+                              className="flex-1"
+                            >
+                              {isRegistering ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  Setting up...
+                                </>
+                              ) : (
+                                <>
+                                  <Fingerprint className="w-3 h-3 mr-1" />
+                                  Set Up
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleTestBiometric}
+                                disabled={isAuthenticating}
+                                className="flex-1"
+                              >
+                                {isAuthenticating ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    Testing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Key className="w-3 h-3 mr-1" />
+                                    Test
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleRemoveBiometric}
+                                className="flex-1"
+                              >
+                                <UserX className="w-3 h-3 mr-1" />
+                                Remove
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Biometric Status */}
+                      {biometricEnabled && (
+                        <div className="px-3 text-xs text-muted-foreground">
+                          {hasCredential(user?.id || '') ? (
+                            <div className="flex items-center gap-1">
+                              <CircleCheck className="w-3 h-3 text-green-500" />
+                              <span>Biometric authentication is set up</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <CircleX className="w-3 h-3 text-orange-500" />
+                              <span>Set up biometric authentication to enable quick login</span>
+                            </div>
+                          )}
+                          {hasBiometricToken() && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <CircleCheck className="w-3 h-3 text-blue-500" />
+                              <span>Quick login token available</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
