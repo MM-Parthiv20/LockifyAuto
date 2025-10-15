@@ -313,43 +313,43 @@ export default function Profile() {
 
                       {/* Biometric Management Actions */}
                       {biometricEnabled && (
-                        <div className="flex gap-2 px-3">
+                        <div className="px-3 space-y-2">
                           {!hasCredential(user?.id || '') ? (
                             <Button
                               size="sm"
                               onClick={handleSetupBiometric}
                               disabled={isRegistering}
-                              className="flex-1"
+                              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
                             >
                               {isRegistering ? (
                                 <>
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                   Setting up...
                                 </>
                               ) : (
                                 <>
-                                  <Fingerprint className="w-3 h-3 mr-1" />
-                                  Set Up
+                                  <Fingerprint className="w-4 h-4 mr-2" />
+                                  Set Up Fingerprint Authentication
                                 </>
                               )}
                             </Button>
                           ) : (
-                            <>
+                            <div className="flex gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={handleTestBiometric}
                                 disabled={isAuthenticating}
-                                className="flex-1"
+                                className="flex-1 border-primary/30 hover:border-primary/50 hover:bg-primary/5"
                               >
                                 {isAuthenticating ? (
                                   <>
-                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                                     Testing...
                                   </>
                                 ) : (
                                   <>
-                                    <Key className="w-3 h-3 mr-1" />
+                                    <Key className="w-4 h-4 mr-1" />
                                     Test
                                   </>
                                 )}
@@ -358,12 +358,12 @@ export default function Profile() {
                                 size="sm"
                                 variant="outline"
                                 onClick={handleRemoveBiometric}
-                                className="flex-1"
+                                className="flex-1 border-destructive/30 hover:border-destructive/50 hover:bg-destructive/5 text-destructive hover:text-destructive"
                               >
-                                <UserX className="w-3 h-3 mr-1" />
+                                <UserX className="w-4 h-4 mr-1" />
                                 Remove
                               </Button>
-                            </>
+                            </div>
                           )}
                         </div>
                       )}

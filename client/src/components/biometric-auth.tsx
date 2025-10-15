@@ -141,14 +141,14 @@ export function BiometricAuth({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Biometric authentication button */}
       {hasStoredCredential && (
         <Button
           type="button"
           onClick={handleAuthenticate}
           disabled={disabled || isAuthenticating || isRegistering}
-          className="w-full bg-primary/90 hover:bg-primary text-primary-foreground"
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
           size="lg"
         >
           {isAuthenticating ? (
@@ -172,7 +172,7 @@ export function BiometricAuth({
           onClick={handleRegister}
           disabled={disabled || isRegistering || isAuthenticating}
           variant="outline"
-          className="w-full"
+          className="w-full border-2 border-dashed border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
           size="lg"
         >
           {isRegistering ? (
@@ -203,7 +203,7 @@ export function BiometricAuth({
 
       {/* Browser support info */}
       {isSupported && (
-        <div className="text-xs text-muted-foreground text-center">
+        <div className="text-xs text-muted-foreground text-center bg-muted/50 rounded-lg p-2">
           Works on mobile devices with fingerprint sensors
         </div>
       )}

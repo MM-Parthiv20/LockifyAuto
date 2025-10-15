@@ -339,6 +339,8 @@ export default function Dashboard() {
           sessionStorage.setItem('lockify-tour-done', '1'); 
         } catch {}
         (window as any).__lockifyTourRunning = false;
+        // Dispatch event to notify other components that tour is complete
+        window.dispatchEvent(new CustomEvent('lockify-tour-completed'));
       });
       
       intro.onexit(async () => {
@@ -348,6 +350,8 @@ export default function Dashboard() {
           sessionStorage.setItem('lockify-tour-done', '1'); 
         } catch {}
         (window as any).__lockifyTourRunning = false;
+        // Dispatch event to notify other components that tour is complete
+        window.dispatchEvent(new CustomEvent('lockify-tour-completed'));
       });
       
       intro.onafterchange(injectSkipButton);

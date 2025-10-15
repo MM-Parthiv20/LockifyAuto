@@ -124,7 +124,7 @@ export function BiometricLogin({ onLoginSuccess, onFallbackToNormal }: Biometric
           <Button
             onClick={handleBiometricLogin}
             disabled={isAttemptingLogin || isAuthenticating}
-            className="w-full bg-primary hover:bg-primary/90"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
             size="lg"
           >
             {isAttemptingLogin || isAuthenticating ? (

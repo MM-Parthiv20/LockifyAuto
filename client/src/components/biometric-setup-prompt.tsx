@@ -45,6 +45,12 @@ export function BiometricSetupPrompt({
         return;
       }
 
+      // Don't show if tour is currently running
+      const tourRunning = (window as any).__lockifyTourRunning;
+      if (tourRunning) {
+        return;
+      }
+
       // Check if biometric should be offered on this device
       const shouldOfferBiometric = await shouldOffer();
       if (shouldOfferBiometric) {
@@ -54,6 +60,35 @@ export function BiometricSetupPrompt({
 
     checkShouldShow();
   }, [userId, biometricEnabled, hasCredential, shouldOffer]);
+
+  // Listen for tour completion to show biometric setup
+  useEffect(() => {
+    const handleTourComplete = () => {
+      // Check again if we should show biometric setup after tour completes
+      const checkAfterTour = async () => {
+        if (!biometricEnabled || hasCredential(userId)) {
+          return;
+        }
+
+        const shouldOfferBiometric = await shouldOffer();
+        if (shouldOfferBiometric && !isOpen) {
+          // Small delay to ensure tour is fully closed
+          setTimeout(() => {
+            setIsOpen(true);
+          }, 300);
+        }
+      };
+
+      checkAfterTour();
+    };
+
+    // Listen for tour completion event
+    window.addEventListener('lockify-tour-completed', handleTourComplete);
+    
+    return () => {
+      window.removeEventListener('lockify-tour-completed', handleTourComplete);
+    };
+  }, [userId, biometricEnabled, hasCredential, shouldOffer, isOpen]);
 
   const handleSetup = async () => {
     try {
@@ -180,7 +215,7 @@ export function BiometricSetupPrompt({
           <Button
             onClick={handleSetup}
             disabled={isSettingUp || isRegistering}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
           >
             {isSettingUp || isRegistering ? (
               <>

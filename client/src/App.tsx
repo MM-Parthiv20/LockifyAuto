@@ -41,12 +41,33 @@ function AppRoutes() {
   }, [location, user, biometricEnabled]);
 
   // Show biometric setup prompt after successful login
+  // But only after tour is complete (if tour is running)
   useEffect(() => {
     if (user && location === '/' && biometricEnabled && !showBiometricSetup) {
-      // Small delay to let the dashboard load first
-      const timer = setTimeout(() => {
+      const checkForTourAndShowBiometric = () => {
+        // Check if tour is running or has been completed
+        const tourDone = sessionStorage.getItem('lockify-tour-done');
+        const tourRunning = (window as any).__lockifyTourRunning;
+        
+        // If tour is running, wait for it to complete
+        if (tourRunning && !tourDone) {
+          // Check again in 500ms
+          setTimeout(checkForTourAndShowBiometric, 500);
+          return;
+        }
+        
+        // If user hasn't completed onboarding, wait for tour to finish
+        if (!user.hasCompletedOnboarding && !tourDone) {
+          setTimeout(checkForTourAndShowBiometric, 500);
+          return;
+        }
+        
+        // Tour is done or not needed, show biometric setup
         setShowBiometricSetup(true);
-      }, 1000);
+      };
+      
+      // Initial delay to let dashboard load
+      const timer = setTimeout(checkForTourAndShowBiometric, 1000);
       return () => clearTimeout(timer);
     }
   }, [user, location, biometricEnabled, showBiometricSetup]);
