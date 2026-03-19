@@ -72,6 +72,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Verify current password for sensitive actions (e.g., delete account / records)
+  app.post("/api/auth/verify-password", authenticateToken, async (req: any, res) => {
+    try {
+      const { password } = req.body as { password?: string };
+      if (!password || typeof password !== "string") {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
+      const user = await storage.getUser(req.user.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Incorrect password" });
+      }
+
+      return res.json({ ok: true });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to verify password" });
+    }
+  });
+
   app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.userId);
@@ -191,6 +215,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: `Deleted ${count} history events` });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete history" });
+    }
+  });
+
+  // Delete user account and all associated data
+  app.delete("/api/users/:id", authenticateToken, async (req: any, res) => {
+    try {
+      const requestedUserId = req.params.id;
+      // Users may only delete their own account
+      if (requestedUserId !== req.user.userId) {
+        return res.status(403).json({ message: "You can only delete your own account" });
+      }
+
+      const success = await storage.deleteUser(requestedUserId);
+      if (!success) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ message: "Account and associated data deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete account" });
     }
   });
 

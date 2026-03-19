@@ -9,6 +9,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserOnboarding(userId: string, hasCompletedOnboarding: boolean): Promise<User | undefined>;
+  deleteUser(userId: string): Promise<boolean>;
   
   // Password record methods
   getPasswordRecords(userId: string): Promise<PasswordRecord[]>;
@@ -133,6 +134,17 @@ class MongoStorage implements IStorage {
     return res.value || undefined;
   }
 
+  async deleteUser(userId: string): Promise<boolean> {
+    const db = await this.getDb();
+    // Delete user document
+    const userResult = await db.collection<User>("users").deleteOne({ id: userId });
+    // Also delete related password records and history events for safety.
+    // Note: in a relational setup, these would typically be handled via FK cascade.
+    await db.collection<PasswordRecord>("password_records").deleteMany({ userId });
+    await db.collection<HistoryEvent>("history_events").deleteMany({ userId });
+    return userResult.deletedCount === 1;
+  }
+
   async getHistoryEvents(userId: string): Promise<HistoryEvent[]> {
     const db = await this.getDb();
     return db.collection<HistoryEvent>("history_events")
@@ -240,6 +252,23 @@ class MemStorage implements IStorage {
     const updated: User = { ...(user as any), hasCompletedOnboarding } as User;
     this.users.set(userId, updated);
     return updated;
+  }
+
+  async deleteUser(userId: string): Promise<boolean> {
+    const existed = this.users.delete(userId);
+    if (!existed) return false;
+    // Remove all password records and history events for this user
+    for (const [id, record] of Array.from(this.passwordRecords.entries())) {
+      if (record.userId === userId) {
+        this.passwordRecords.delete(id);
+      }
+    }
+    for (const [id, event] of Array.from(this.historyEvents.entries())) {
+      if (event.userId === userId) {
+        this.historyEvents.delete(id);
+      }
+    }
+    return true;
   }
 
   async getHistoryEvents(userId: string): Promise<HistoryEvent[]> {

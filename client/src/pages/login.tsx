@@ -182,7 +182,6 @@ export default function Login() {
             <>
               <div className="my-4">
                 <Separator className="my-4">
-                  <span className="text-xs text-muted-foreground bg-background px-2">or</span>
                 </Separator>
               </div>
               

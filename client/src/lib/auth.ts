@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from './queryClient';
-import { history } from './history';
-import { VibrateIfEnabled } from './vibration';
-import { 
-  generateBiometricToken, 
-  authenticateWithBiometricToken, 
+import React, { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "./queryClient";
+import { history } from "./history";
+import { VibrateIfEnabled } from "./vibration";
+import {
+  generateBiometricToken,
+  authenticateWithBiometricToken,
   getBiometricToken,
   removeBiometricToken,
-  type BiometricToken 
-} from './biometric';
+  type BiometricToken,
+} from "./biometric";
 
 interface User {
   id: string;
@@ -18,13 +18,18 @@ interface User {
   profileimage?: string;
 }
 
-const AUTH_KEY = 'lockify-auth';
+type AuthState = {
+  user: User;
+  token?: string;
+  expiresAt?: number;
+};
+
+const AUTH_KEY = "lockify-auth";
 const SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutes
-const DEFAULT_CREDENTIALS = { username: 'parthiv21', password: 'Parthiv2011!' };
-const AVATAR_CACHE_PREFIX = 'lockify-avatar-';
+const AVATAR_CACHE_PREFIX = "lockify-avatar-";
 
 export function useAuth() {
-  const [auth, setAuth] = useState<{ user: User; expiresAt?: number } | null>(() => {
+  const [auth, setAuth] = useState<AuthState | null>(() => {
     try {
       const raw = localStorage.getItem(AUTH_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
@@ -41,19 +46,25 @@ export function useAuth() {
   });
   const queryClient = useQueryClient();
 
-  const setLoggedIn = (user: User, options?: { preserveExpiry?: boolean }) => {
+  const setLoggedIn = (user: User, token?: string, options?: { preserveExpiry?: boolean }) => {
     const currentExpiresAt = auth?.expiresAt;
-    const expiresAt = options?.preserveExpiry && currentExpiresAt
-      ? currentExpiresAt
-      : Date.now() + SESSION_DURATION_MS;
-    // Default onboarding status: demo user -> completed; others -> not completed
-    const defaultOnboarding = user.id === 'default' ? true : false;
-    const value = { user: { ...user, hasCompletedOnboarding: user.hasCompletedOnboarding ?? defaultOnboarding }, expiresAt };
+    const expiresAt =
+      options?.preserveExpiry && currentExpiresAt
+        ? currentExpiresAt
+        : Date.now() + SESSION_DURATION_MS;
+    const value: AuthState = {
+      user: {
+        ...user,
+        hasCompletedOnboarding: user.hasCompletedOnboarding ?? false,
+      },
+      token: token ?? auth?.token,
+      expiresAt,
+    };
     localStorage.setItem(AUTH_KEY, JSON.stringify(value));
     setAuth(value);
     // notify other hook instances in same tab
     try {
-      window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
+      window.dispatchEvent(new CustomEvent("lockify-auth-updated"));
     } catch {}
   };
 
@@ -75,11 +86,11 @@ export function useAuth() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === AUTH_KEY) syncFromStorage();
     };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('lockify-auth-updated' as any, syncFromStorage as any);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("lockify-auth-updated" as any, syncFromStorage as any);
     return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('lockify-auth-updated' as any, syncFromStorage as any);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("lockify-auth-updated" as any, syncFromStorage as any);
     };
   }, []);
 
@@ -100,34 +111,21 @@ export function useAuth() {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
-      // default credentials
-      if (
-        credentials.username === DEFAULT_CREDENTIALS.username &&
-        credentials.password === DEFAULT_CREDENTIALS.password
-      ) {
-        // restore cached avatar (survives logout/login for default user)
-        let cachedAvatar: string | undefined;
-        try {
-          cachedAvatar = localStorage.getItem(AVATAR_CACHE_PREFIX + credentials.username) || undefined;
-        } catch {}
-        return { id: 'default', username: credentials.username, profileimage: cachedAvatar, hasCompletedOnboarding: true } as User;
+      const res = await apiRequest("POST", "/api/auth/login", credentials);
+      const body = await res.json() as { user: User; token: string };
+      if (!body?.user || !body?.token) {
+        throw new Error("Invalid login response from server");
       }
-      // Otherwise, check against MockAPI users
-      const res = await apiRequest('GET', '/api/users');
-      const users = (await res.json()) as Array<{ id: string; username: string; password: string; profileimage?: string }>;
-      const match = users.find(
-        (u) => u.username === credentials.username && u.password === credentials.password,
-      );
-      if (!match) throw new Error('Invalid credentials');
-      // For non-default users, default to not completed until they finish onboarding
-      return { id: match.id, username: match.username, profileimage: match.profileimage, hasCompletedOnboarding: false } as User;
+      return body;
     },
-    onSuccess: (user) => {
-      setLoggedIn(user);
+    onSuccess: ({ user, token }) => {
+      setLoggedIn(user, token);
       // ✅ Vibration feedback on successful login
       VibrateIfEnabled.short();
       // Fire-and-forget history logging
-      void history.add({ type: 'login', summary: `Logged in as ${user.username}` }).catch(() => {});
+      void history
+        .add({ type: "login", summary: `Logged in as ${user.username}` })
+        .catch(() => {});
     },
   });
 
@@ -142,53 +140,44 @@ export function useAuth() {
       } catch {}
       
       // Check if this is the default user or a registered user
-      if (token.username === DEFAULT_CREDENTIALS.username) {
-        return { 
-          id: 'default', 
-          username: token.username, 
-          profileimage: cachedAvatar, 
-          hasCompletedOnboarding: true 
-        } as User;
-      } else {
-        // For registered users, we'd typically fetch from API
-        // For now, we'll use a default structure
-        return { 
-          id: token.userId, 
-          username: token.username, 
-          profileimage: cachedAvatar, 
-          hasCompletedOnboarding: false 
-        } as User;
-      }
+      return {
+        id: token.userId,
+        username: token.username,
+        profileimage: cachedAvatar,
+        hasCompletedOnboarding: false,
+      } as User;
     },
     onSuccess: (user) => {
       setLoggedIn(user);
       // ✅ Vibration feedback on successful biometric login
       VibrateIfEnabled.short();
       // Fire-and-forget history logging
-      void history.add({ type: 'login:biometric', summary: `Biometric login as ${user.username}` }).catch(() => {});
+      void history
+        .add({ type: "login:biometric", summary: `Biometric login as ${user.username}` })
+        .catch(() => {});
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string }) => {
-      // Check if username already exists before creating
-      const existingRes = await apiRequest('GET', '/api/users');
-      const existingUsers = (await existingRes.json()) as Array<{ id: string; username: string }>;
-      const usernameTaken = existingUsers.some((u) => u.username === userData.username);
-      if (usernameTaken) {
-        throw new Error('this user already exist');
-      }
-
       const randomId = Math.floor(Math.random() * 100) + 1;
       const profileimage = `https://avatar.iran.liara.run/public/${randomId}`;
-      const res = await apiRequest('POST', '/api/users', { ...userData, profileimage });
-      const created = await res.json();
-      return { id: created.id as string, username: created.username as string, profileimage: created.profileimage as string, hasCompletedOnboarding: false } as User;
+      const res = await apiRequest("POST", "/api/auth/register", {
+        ...userData,
+        profileimage,
+      });
+      const body = await res.json() as { user: User; token: string };
+      if (!body?.user || !body?.token) {
+        throw new Error("Invalid register response from server");
+      }
+      return body;
     },
-    onSuccess: (user) => {
-      setLoggedIn(user);
+    onSuccess: ({ user, token }) => {
+      setLoggedIn(user, token);
       // Fire-and-forget history logging
-      void history.add({ type: 'register', summary: `Registered new user ${user.username}` }).catch(() => {});
+      void history
+        .add({ type: "register", summary: `Registered new user ${user.username}` })
+        .catch(() => {});
     },
   });
 
@@ -198,10 +187,10 @@ export function useAuth() {
     queryClient.clear();
     // No hard reload to avoid 404 in static deployments; ProtectedRoute will render Login
     try {
-      window.dispatchEvent(new CustomEvent('lockify-auth-updated'));
+      window.dispatchEvent(new CustomEvent("lockify-auth-updated"));
     } catch {}
     // Fire-and-forget history logging
-    void history.add({ type: 'logout', summary: 'Logged out' }).catch(() => {});
+    void history.add({ type: "logout", summary: "Logged out" }).catch(() => {});
   };
 
   // Generate biometric token after successful login
@@ -247,26 +236,29 @@ export function useAuth() {
   const updateOnboardingStatus = useMutation({
     mutationFn: async (hasCompleted: boolean) => {
       if (!auth?.user) return;
-      const updated: User = { ...auth.user, hasCompletedOnboarding: hasCompleted };
-      setLoggedIn(updated, { preserveExpiry: true });
+      const res = await apiRequest("PUT", "/api/auth/onboarding", {
+        hasCompletedOnboarding: hasCompleted,
+      });
+      const body = (await res.json()) as { hasCompletedOnboarding: boolean };
+      const updated: User = {
+        ...auth.user,
+        hasCompletedOnboarding: body.hasCompletedOnboarding,
+      };
+      setLoggedIn(updated, auth.token, { preserveExpiry: true });
       return updated;
     },
   });
 
   const updateProfileImageMutation = useMutation({
     mutationFn: async (profileimage: string) => {
-      if (!auth?.user?.id) throw new Error('Missing user id');
-      // Persist to API unless default demo user
-      if (auth.user.id !== 'default') {
-        await apiRequest('PUT', `/api/users/${auth.user.id}`, { profileimage });
-      }
-      // Persist locally for default/demo user so it survives logout/login
+      if (!auth?.user?.id) throw new Error("Missing user id");
+      // Persist locally so it survives logout/login for this browser
       try {
-        const usernameKey = auth.user.username || 'default';
+        const usernameKey = auth.user.username || "default";
         localStorage.setItem(AVATAR_CACHE_PREFIX + usernameKey, profileimage);
       } catch {}
       const updated: User = { ...auth.user, profileimage };
-      setLoggedIn(updated, { preserveExpiry: true });
+      setLoggedIn(updated, auth.token, { preserveExpiry: true });
       return updated;
     },
   });

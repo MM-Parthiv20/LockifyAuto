@@ -1,3 +1,6 @@
+import type { HistoryEvent as BackendHistoryEvent } from "@shared/schema";
+import { apiRequest } from "./queryClient";
+
 type HistoryEventType =
   | "login"
   | "logout"
@@ -19,8 +22,6 @@ export interface HistoryEvent {
   userId?: string;
 }
 
-const HISTORY_API_URL = "https://677537fa92222241481aee8e.mockapi.io/history";
-
 function getCurrentUserId(): string | null {
   try {
     const raw = localStorage.getItem('lockify-auth');
@@ -35,42 +36,8 @@ function getCurrentUserId(): string | null {
 
 function dispatchUpdate(): void {
   try {
-    window.dispatchEvent(new Event('lockify-history-updated' as any));
+    window.dispatchEvent(new Event("lockify-history-updated" as any));
   } catch {}
-}
-
-// Parse MockAPI history event format
-function parseHistoryEvent(raw: any): HistoryEvent {
-  return {
-    id: raw.id,
-    type: raw.type as HistoryEventType,
-    timestamp: Number(raw.timestamp) || Date.now(),
-    summary: raw.summary,
-    details: (() => {
-      if (!raw.details) return undefined;
-      if (typeof raw.details === 'string') {
-        try { return JSON.parse(raw.details); } catch { return { raw: raw.details }; }
-      }
-      return raw.details;
-    })(),
-    userId: raw.userId
-  };
-}
-
-// Fetch history from MockAPI
-async function fetchFromAPI(): Promise<HistoryEvent[]> {
-  const userId = getCurrentUserId();
-  if (!userId) return [];
-  
-  try {
-    const url = `${HISTORY_API_URL}?userId=${encodeURIComponent(userId)}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data.map(parseHistoryEvent) : [];
-  } catch {
-    return [];
-  }
 }
 
 export const history = {
@@ -81,39 +48,56 @@ export const history = {
     const timestamp = event.timestamp ?? Date.now();
     
     try {
-      // Send to MockAPI and wait for response
-      const res = await fetch(HISTORY_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          type: event.type,
-          timestamp: timestamp,
-          summary: event.summary,
-          details: event.details ? JSON.stringify(event.details) : "",
-          createdAt: String(timestamp),
-          updatedAt: String(timestamp),
-        })
+      const res = await apiRequest("POST", "/api/history", {
+        userId,
+        type: event.type,
+        summary: event.summary,
+        details: event.details ? JSON.stringify(event.details) : undefined,
+        timestamp: new Date(timestamp).toISOString(),
       });
-      
-      if (!res.ok) throw new Error('Failed to save history');
-      
-      const saved = await res.json();
-      const newEvent = parseHistoryEvent(saved);
+
+      if (!res.ok) throw new Error("Failed to save history");
+
+      const saved = (await res.json()) as BackendHistoryEvent;
+      const newEvent: HistoryEvent = {
+        id: saved.id,
+        type: saved.type as HistoryEventType,
+        timestamp: new Date(saved.timestamp as unknown as string).getTime(),
+        summary: saved.summary,
+        details: saved.details ? JSON.parse(String(saved.details)) : undefined,
+        userId: saved.userId,
+      };
       
       // Notify listeners that history was updated
       dispatchUpdate();
       
       return newEvent;
     } catch (error) {
-      console.error('Failed to save history:', error);
+      console.error("Failed to save history:", error);
       return null;
     }
   },
 
   async list(): Promise<HistoryEvent[]> {
-    const events = await fetchFromAPI();
-    return events.sort((a, b) => b.timestamp - a.timestamp);
+    const userId = getCurrentUserId();
+    if (!userId) return [];
+
+    try {
+      const res = await apiRequest("GET", "/api/history");
+      if (!res.ok) return [];
+      const data = (await res.json()) as BackendHistoryEvent[];
+      const events: HistoryEvent[] = data.map((raw) => ({
+        id: raw.id,
+        type: raw.type as HistoryEventType,
+        timestamp: new Date(raw.timestamp as unknown as string).getTime(),
+        summary: raw.summary,
+        details: raw.details ? JSON.parse(String(raw.details)) : undefined,
+        userId: raw.userId,
+      }));
+      return events.sort((a, b) => b.timestamp - a.timestamp);
+    } catch {
+      return [];
+    }
   },
 
   async clear(): Promise<void> {
@@ -121,26 +105,13 @@ export const history = {
     if (!userId) return;
     
     try {
-      const url = `${HISTORY_API_URL}?userId=${encodeURIComponent(userId)}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch history');
-      
-      const rows = await res.json();
-      const ids = Array.isArray(rows) ? rows.map((r: any) => r.id) : [];
-      
-      // Delete all events for this user
-      await Promise.all(
-        ids.map(id => 
-          fetch(`${HISTORY_API_URL}/${encodeURIComponent(id)}`, { 
-            method: 'DELETE' 
-          }).catch(() => {})
-        )
-      );
+      const res = await apiRequest("DELETE", "/api/history");
+      if (!res.ok) throw new Error("Failed to clear history");
       
       // Notify listeners
       dispatchUpdate();
     } catch (error) {
-      console.error('Failed to clear history:', error);
+      console.error("Failed to clear history:", error);
       throw error;
     }
   },

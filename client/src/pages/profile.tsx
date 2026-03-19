@@ -16,6 +16,7 @@ import { useTheme } from "@/components/theme-provider";
 import { VibrationPreference, Vibration } from "@/lib/vibration";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 import { useBiometric } from "@/hooks/use-biometric";
+import { Input } from "@/components/ui/input";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
@@ -29,6 +30,9 @@ export default function Profile() {
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [vibrationEnabled, setVibrationEnabled] = useState(() => VibrationPreference.isEnabled());
+  const [deleteAllPassword, setDeleteAllPassword] = useState("");
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
+  const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
   
   // Biometric preferences
   const { biometricEnabled, setBiometricEnabled } = useUserPreferences();
@@ -107,6 +111,40 @@ export default function Profile() {
       title: "Biometric authentication removed",
       description: "All biometric data has been cleared from this device"
     });
+  };
+
+  const verifyPassword = async (password: string): Promise<boolean> => {
+    if (!password) {
+      toast({
+        title: "Password required",
+        description: "Please enter your account password to continue.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    try {
+      setIsVerifyingPassword(true);
+      const res = await apiRequest("POST", "/api/auth/verify-password", { password });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        toast({
+          title: "Incorrect password",
+          description: body?.message || "The password you entered is not correct.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    } catch (e: any) {
+      toast({
+        title: "Failed to verify password",
+        description: e?.message || "",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsVerifyingPassword(false);
+    }
   };
 
   // Prefer API-saved profile image; fallback to deterministic avatar
@@ -242,10 +280,12 @@ export default function Profile() {
                   <div className="font-medium">{stats.total}</div>
                 </div>
 
+
+
+                
+
                 {/* Preferences Section */}
                 <div className="mt-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground mb-2">Preferences</h3>
-                  
                   {/* Vibration Toggle */}
                   <div className="flex items-center justify-between py-2 px-3 rounded-md border border-border bg-muted/30">
                     <div className="flex items-center gap-3">
@@ -313,10 +353,10 @@ export default function Profile() {
 
                       {/* Biometric Management Actions */}
                       {biometricEnabled && (
-                        <div className="px-3 space-y-2">
+                        <div className="space-y-2">
                           {!hasCredential(user?.id || '') ? (
                             <Button
-                              size="sm"
+                              size="lg"
                               onClick={handleSetupBiometric}
                               disabled={isRegistering}
                               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
@@ -473,12 +513,26 @@ export default function Profile() {
                           This action cannot be undone. This will permanently delete all your password records.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
+                      <div className="space-y-2 py-2">
+                        <div className="text-sm text-muted-foreground">
+                          For your security, please enter your account password to confirm.
+                        </div>
+                        <Input
+                          type="password"
+                          placeholder="Account password"
+                          value={deleteAllPassword}
+                          onChange={(e) => setDeleteAllPassword(e.target.value)}
+                          data-testid="input-delete-all-password"
+                        />
+                      </div>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                          disabled={isDeletingAll}
+                          disabled={isDeletingAll || isVerifyingPassword}
                           onClick={async () => {
-                            if (isDeletingAll) return;
+                            if (isDeletingAll || isVerifyingPassword) return;
+                            const ok = await verifyPassword(deleteAllPassword);
+                            if (!ok) return;
                             setIsDeletingAll(true);
                             try {
                               const res = await apiRequest("GET", "/api/records");
@@ -502,6 +556,7 @@ export default function Profile() {
                                 toast({ title: "Failed to delete records", description: "No records were deleted", variant: "destructive" });
                               }
                               setIsDeleteAllOpen(false);
+                              setDeleteAllPassword("");
                             } catch (e: any) {
                               toast({ title: "Failed to delete records", description: e?.message || "", variant: "destructive" });
                             } finally {
@@ -509,7 +564,7 @@ export default function Profile() {
                             }
                           }}
                         >
-                          {isDeletingAll ? "Deleting..." : "Delete"}
+                          {isDeletingAll || isVerifyingPassword ? "Please wait..." : "Delete"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -532,14 +587,30 @@ export default function Profile() {
                           This will permanently delete your account and all associated data. This action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
+                      <div className="space-y-2 py-2">
+                        <div className="text-sm text-muted-foreground">
+                          For your security, please enter your account password to confirm.
+                        </div>
+                        <Input
+                          type="password"
+                          placeholder="Account password"
+                          value={deleteAccountPassword}
+                          onChange={(e) => setDeleteAccountPassword(e.target.value)}
+                          data-testid="input-delete-account-password"
+                        />
+                      </div>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
+                          disabled={isVerifyingPassword}
                           onClick={async () => {
                             try {
                               if (!user?.id) throw new Error("Missing user id");
+                              const ok = await verifyPassword(deleteAccountPassword);
+                              if (!ok) return;
                               await apiRequest("DELETE", `/api/users/${user.id}`);
                               toast({ title: "Account deleted" });
+                              setDeleteAccountPassword("");
                               logout();
                             } catch (e: any) {
                               toast({ title: "Failed to delete account", description: e?.message || "", variant: "destructive" });
@@ -589,8 +660,16 @@ export default function Profile() {
         isOpen={isOnboardingOpen}
         onComplete={async () => {
           setIsOnboardingOpen(false);
-          await updateOnboardingStatus(true);
-          toast({ title: "Onboarding completed!" });
+          try {
+            await updateOnboardingStatus(true);
+            toast({ title: "Onboarding completed!" });
+          } catch (e: any) {
+            toast({
+              title: "Failed to complete onboarding",
+              description: e?.message || "",
+              variant: "destructive",
+            });
+          }
         }}
       />
     </div>
